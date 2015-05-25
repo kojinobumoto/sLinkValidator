@@ -57,7 +57,7 @@ o How to specify URL to browse.
 
 o All available options
 
- -a,--all                      Also check "li" tag.
+ -a,--all                      Also check "link" tag.
  -f,--url-list <FILE>          Specify a text file containing urls to be
                                checked.
  -h,--help                     print this help.
