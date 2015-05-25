@@ -144,7 +144,7 @@ public class LinkValidator {
 
 		Option optAny	= Option.builder( "a" )
 				.longOpt("all")
-				.desc("Also check \"li\" tag.")
+				.desc("Also check \"link\" tag.")
 				.required(false)
 				.build();
 		Option optListFile = Option.builder( "f" )
