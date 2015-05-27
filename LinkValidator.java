@@ -267,12 +267,12 @@ public class LinkValidator {
 					}
 				}
 			}
-			// -v : show version
+			// -V : show version
 			if ( cmdline.hasOption("V") ) {
 				System.out.println(strProgramName + " : Version " + strVersionNum + "." );
 				System.exit(0);
 			}
-			// -V : verbose mode flag
+			// -v : verbose mode flag
 			if ( cmdline.hasOption("v") ) {
 				boolOptVerbose = true;
 			}
