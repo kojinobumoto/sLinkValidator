@@ -409,7 +409,14 @@ public class LinkValidator {
 							List<Future<Object>> futures = executorService.invokeAll(todo);
 							if (boolOptVerbose) {
 								for(Future<Object> future : futures) {
-									System.out.println("future.get = " + future.get().toString());
+									if (future.get() == null) {
+										System.out.println("future.get() is null. The futre object is " + future.toString() + " .");
+										new PrintStream(f_out_exceptions).println("future.get() is null. The futre object is " + future.toString() + " .");
+									}
+									else {
+										//System.out.println("future.get = " + future.get().toString()); //too verbose
+										new PrintStream(f_out_ok).println("future.get = " + future.get().toString());
+									}
 								}
 							}
 							

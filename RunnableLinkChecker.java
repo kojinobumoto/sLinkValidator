@@ -232,7 +232,6 @@ public class RunnableLinkChecker implements Runnable {
 	 * @return ResponseDataObj(response, statusCode)
 	 * @throws Exception
 	 */
-	//public static ResponseDataObj isLinkBroken(URL url, String uid, String password) throws Exception
 	public static ResponseDataObj isLinkBroken(URL url, String uid, String password) 
 	{
 		
@@ -355,6 +354,7 @@ public class RunnableLinkChecker implements Runnable {
 		
 		long numThreadId = Thread.currentThread().getId();
 		String exp_msg = null;
+		String strPtnProtocol = "https{0,1}://";
 		
 		strFname_ok.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__healthy_links.txt");
 		strFname_error.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__broken_links.txt");
@@ -390,7 +390,8 @@ public class RunnableLinkChecker implements Runnable {
 			String url_get = "";
 			
 			if ( this.uid != "" || this.password != "") {
-				url_get = this.strURL.replaceFirst( "(https{0,1}://)", "$1"+ this.uid +":"+ this.password +"@" );
+				//url_get = this.strURL.replaceFirst( "(https{0,1}://)", "$1"+ this.uid +":"+ this.password +"@" );
+				url_get = this.strURL.replaceFirst( "(" + strPtnProtocol + ")", "$1"+ this.uid +":"+ this.password +"@" );  // add id and pass to URL (e.g. https{0,1}:// -> https{0,1}://uid:password@ )
 			}
 			else {
 				url_get = this.strURL;
@@ -401,7 +402,8 @@ public class RunnableLinkChecker implements Runnable {
 			//
 			// replace some characters in url to use it as the capture images filename(png).
 			//
-			String url_httpTrimed_01 = this.strURL.replaceFirst("^http://[^/]+/", "");
+			//String url_httpTrimed_01 = this.strURL.replaceFirst("^https{0,1}://[^/]+/", "");
+			String url_httpTrimed_01 = this.strURL.replaceFirst("^" + strPtnProtocol + "[^/]+/", "");  //trim protocol and hostname from URL. (e.g. http(s)://hostname/path -> path)
 			String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|]", "_");
 			
 			// taking a screenshot.
@@ -444,7 +446,8 @@ public class RunnableLinkChecker implements Runnable {
 			    	if ( strTgtURL != null )
 			    	{
 			    		String msg = null;
-			    		String noUidPwdURL = strTgtURL.replaceFirst( "(https{0,1}://)" + this.uid + ":" + this.password + "@", "$1" );
+			    		//String noUidPwdURL = strTgtURL.replaceFirst( "(https{0,1}://)" + this.uid + ":" + this.password + "@", "$1" );
+			    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)  
 			    		
 			    		if(visitedLinkMap.containsKey(noUidPwdURL))
 			    		{
