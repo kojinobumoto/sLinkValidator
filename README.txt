@@ -1,4 +1,4 @@
-o Program Name
+﻿o Program Name
   SLinkValidator
 
 o Basic behavior
@@ -63,6 +63,7 @@ o All available options
  -h,--help                     print this help.
  -id,--user <USERNAME>         user id for the BASIC authentication.
  -p,--password <PASSWORD>      password for the BASIC authentication.
+ -o, --timeout <Timeout Sec>   second for timeout.
  -T,--thread <NUM of Thread>   number of thread (must be an integer, less
                                than 16). 'AUTO' for available processor
                                num.

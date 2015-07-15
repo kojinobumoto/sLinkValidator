@@ -49,6 +49,7 @@ public class RunnableLinkChecker implements Runnable {
 	private String strURL;
 	private String uid;
 	private String password;
+	private int numTimeoutSec;
 	private boolean boolRunAsDFSSearch;
 	
 	static Pattern ptn_http		= Pattern.compile("^https{0,1}://");
@@ -73,12 +74,14 @@ public class RunnableLinkChecker implements Runnable {
 								, String __url
 								, String __uid
 								, String __password
+								, int __timeout
 								, boolean __boolRunAsDFSSearch) throws FileNotFoundException {
 		
 		this.strThreadID	= __strThreadID;
 		this.strURL			= __url;
 		this.uid			= __uid;
 		this.password		= __password;
+		this.numTimeoutSec	= __timeout;
 		this.boolRunAsDFSSearch			= __boolRunAsDFSSearch;
 		
 		numHealthyLink	= new ThreadLocal<Integer>() {
@@ -371,9 +374,9 @@ public class RunnableLinkChecker implements Runnable {
 		
 		// FireFox
 		FirefoxDriver browserDriver = new FirefoxDriver();
-		browserDriver.manage().timeouts().pageLoadTimeout(60, TimeUnit.SECONDS);
-		browserDriver.manage().timeouts().implicitlyWait(60, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
-		browserDriver.manage().timeouts().setScriptTimeout(60, TimeUnit.SECONDS);
+		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
+		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
+		browserDriver.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
 		
 		try {
 			

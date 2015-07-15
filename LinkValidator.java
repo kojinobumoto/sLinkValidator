@@ -44,7 +44,7 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.01";
+	private static String strVersionNum = "0.02";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
@@ -53,6 +53,7 @@ public class LinkValidator {
 	private static String strRootURL		= "";
 	private static boolean boolOptAny		= false;
 	private static boolean boolOptVerbose	= false;
+	private static int numTimeoutSec = 60; // actually it will be *2 (e.g. if you set 60, the timeout will be 120 sec).
 	private static int numThread	= 1;
 	// (a note about numMaxThread)
 	// Since the default initial capacity of ConcurrentHashMap() ("concurrencyLevel") 
@@ -106,6 +107,9 @@ public class LinkValidator {
 	}
 	public final static ConcurrentLinkedDeque<String> getStack() {
 		return stack;
+	}
+	public final static int getNumTimeoutSec() {
+		return numTimeoutSec;
 	}
 	//
 	// End of getter definitions
@@ -166,6 +170,13 @@ public class LinkValidator {
 				.hasArg()
 				.argName("USERNAME")
 				.build();
+		Option optTimeOut	= Option.builder("o")
+				.longOpt("timeout")
+				.desc("timeout second.")
+				.required(false)
+				.hasArg()
+				.argName("TIMEOUT")
+				.build();
 		Option optPasswd	= Option.builder("p")
 				.longOpt("password")
 				.desc("password for the BASIC authentication.")
@@ -203,6 +214,7 @@ public class LinkValidator {
 		options.addOption(optUid);					// -id
 		options.addOption(optPasswd);				// -p
 		options.addOption(optNumThread);			// -T
+		options.addOption(optTimeOut);				// -o
 		options.addOption(optUrl);					// -url
 		options.addOption(optVerbose);				// -v
 		options.addOption(optVersionNum);			// -V
@@ -237,6 +249,10 @@ public class LinkValidator {
 			// -p : password for BASIC auth.
 			if (cmdline.hasOption("p")) {
 				strPasswd = cmdline.getOptionValue("p");
+			}
+			// -o : timeout second.
+			if (cmdline.hasOption("o")) {
+				numTimeoutSec = Integer.parseInt(cmdline.getOptionValue("o"))/2;
 			}
 			// -T : num of thread.
 			if (cmdline.hasOption("T")) {
@@ -378,7 +394,7 @@ public class LinkValidator {
 							
 							new PrintStream(f_out_stackcontents).println(url);
 
-							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, boolRunAsDFSSearch);
+							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsDFSSearch);
 
 							Thread thread_1 = new Thread( runnable, Integer.toString(numBrowsedPages) );
 							thread_1.start();
@@ -398,7 +414,7 @@ public class LinkValidator {
 								url = stack.pop();
 								
 								new PrintStream(f_out_stackcontents).println(url);
-								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, boolRunAsDFSSearch);
+								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsDFSSearch);
 								//executorService.execute(runnable);
 								todo.add(Executors.callable(runnable));
 								
