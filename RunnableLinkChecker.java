@@ -368,6 +368,8 @@ public class RunnableLinkChecker implements Runnable {
 		String strRootURL	= LinkValidator.getRootURL();
 		boolean boolOptAny	= LinkValidator.getOptAny();
 		boolean boolOptVerbose	= LinkValidator.getOptVerboseFlg();
+		boolean boolOptCapture = LinkValidator.getOptScreenCaptureFlg();
+		boolean boolOptSkipElement = LinkValidator.getOptSkipElementFlg();
 
 		ConcurrentHashMap<String, Integer> visitedLinkMap = LinkValidator.getVisitedLinkMap();
 		ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
@@ -402,140 +404,146 @@ public class RunnableLinkChecker implements Runnable {
 
 			browserDriver.get(url_get);
 			
-			//
-			// replace some characters in url to use it as the capture images filename(png).
-			//
-			//String url_httpTrimed_01 = this.strURL.replaceFirst("^https{0,1}://[^/]+/", "");
-			String url_httpTrimed_01 = this.strURL.replaceFirst("^" + strPtnProtocol + "[^/]+/", "");  //trim protocol and hostname from URL. (e.g. http(s)://hostname/path -> path)
-			String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|]", "_");
-			
-			// taking a screenshot.
-			File scrFile = ((TakesScreenshot)browserDriver).getScreenshotAs(OutputType.FILE);
-			File f_ScreenShot = new File("results" + File.separator + "screenshot" + File.separator + URLDecoder.decode(url_httpTrimed_02, "UTF-8") + ".png");
-			if (!f_ScreenShot.exists()) {
-				FileUtils.copyFile(scrFile, f_ScreenShot);
+			if (boolOptCapture) {
+				// take the screenshot of the browsing page.
+				
+				//
+				// replace some characters in url to use it as the capture images filename(png).
+				//
+				//String url_httpTrimed_01 = this.strURL.replaceFirst("^https{0,1}://[^/]+/", "");
+				String url_httpTrimed_01 = this.strURL.replaceFirst("^" + strPtnProtocol + "[^/]+/?", "");  //trim protocol and hostname from URL. (e.g. http(s)://hostname/path -> path)
+				String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|]", "_");
+				
+				File scrFile = ((TakesScreenshot)browserDriver).getScreenshotAs(OutputType.FILE);
+				File f_ScreenShot = new File("results" + File.separator + "screenshot" + File.separator + URLDecoder.decode(url_httpTrimed_02, "UTF-8") + ".png");
+				if (!f_ScreenShot.exists()) {
+					FileUtils.copyFile(scrFile, f_ScreenShot);
+				}
 			}
 			
-		    ArrayList<WebElement> allLinks = findAllLinks(browserDriver, boolOptAny);   
+			if (!boolOptSkipElement) {
+			
+			    ArrayList<WebElement> allLinks = findAllLinks(browserDriver, boolOptAny);   
+			    
+			    System.out.println("Total number of elements found " + allLinks.size());
+			    new PrintStream(f_out_ok.get()).println( "Total number of elements found " + allLinks.size() );
 		    
-		    System.out.println("Total number of elements found " + allLinks.size());
-		    new PrintStream(f_out_ok.get()).println( "Total number of elements found " + allLinks.size() );
-	    
-		    URL objTgtURL = null;
-
-		    for( WebElement element : allLinks ){
-		 
-			    try
-			    {
-			    	String strTagName =  element.getTagName();
-			    	String strTgtURL = null;
-			    	String linkType = "";
-			    	
-			    	if (strTagName.equalsIgnoreCase("a")) {
-			    		strTgtURL = element.getAttribute("href");
-			    		linkType = "<a>";
-			    	}
-			    	else if (strTagName.equalsIgnoreCase("img")) {
-			    		strTgtURL  = element.getAttribute("src");
-			    		linkType = "<img>";
-			    	}
-			    	else if (strTagName.equalsIgnoreCase("link")) {
-			    		strTgtURL  = element.getAttribute("href");
-			    		linkType = "<link>";
-			    	}
-			    	
-			    	ResponseDataObj respData;
-			    	
-			    	if ( strTgtURL != null )
-			    	{
-			    		String msg = null;
-			    		//String noUidPwdURL = strTgtURL.replaceFirst( "(https{0,1}://)" + this.uid + ":" + this.password + "@", "$1" );
-			    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)  
-			    		
-			    		if(visitedLinkMap.containsKey(noUidPwdURL))
-			    		{
-			    			msg = (boolOptVerbose) ? 
-			    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(visited)" 
-			    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
-			    			
-			    			new PrintStream(f_out_ok.get()).println( msg );
-			    			
-			    		}
-			    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL)) {
-			    			// external link
-			    			
-			    			msg = (boolOptVerbose) ?
-			    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(external link)"
-			    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
-			    			
-			    			new PrintStream(f_out_externalLinks.get()).println( msg );
-			    			Integer prevCount = (Integer) numExternalLinks.get();
-			    			numExternalLinks.set( new Integer(prevCount.intValue() + 1) );
-			    		}
-			    		else {
-			    			
-			    			// (Note)
-			    			// at this moment, objTgtURL is always null because of finally() part.
-			    			
-			    			Matcher mtch_no_http = ptn_no_http.matcher(strTgtURL);
-			    			if ( mtch_no_http.find() )  // if strTgtURL was relative.
-				    		{
-			    				objTgtURL = new URL(new URL(strRootURL), strTgtURL);
-				    		}
-			    			else {
-			    				objTgtURL = new URL(strTgtURL);
-			    			}
-			    			
-				    		respData = isLinkBroken(objTgtURL, uid, password);
-			    			visitedLinkMap.put(strTgtURL, 1);
-	    			
-			    			if( (this.boolRunAsDFSSearch == true)
-			    					&& !( strTgtURL.contains("mailto:") || strTgtURL.contains("tel:") )
-			    					&& strTagName.equalsIgnoreCase("a")
-			    					&& !stack.contains(noUidPwdURL)
-			    					&& !(strTgtURL.lastIndexOf("#") > strTgtURL.lastIndexOf("/"))
-			    					) { // Do not access to not-A-tag URL via Firefox driver.
-			    				stack.push(noUidPwdURL);
-			    			}
-				    		
-				    		msg = this.strURL 
-				    				+ "\t" + linkType 
-				    				+ "\t" + noUidPwdURL
-				    				+ "\t" + respData.getRespMsg() 
-				    				+ "\t" + respData.getRespCode();
-				    		 
-			    			if ( respData.getRespCode() >= 400 )
-			    			{
-		    					new PrintStream(f_out_error.get()).println(msg);
-		    					Integer prevCount = (Integer) numInvalidLink.get();
-			    				numInvalidLink.set(new Integer(prevCount.intValue() + 1) ); 
-			    			}
-			    			else
-			    			{
-		    					new PrintStream(f_out_ok.get()).println(msg);
-		    					Integer prevCount = (Integer) numHealthyLink.get();
-			    				numHealthyLink.set( new Integer(prevCount.intValue() + 1) );
-			    			}
-			    		}
-
-		    			System.out.println(msg);
+			    URL objTgtURL = null;
 	
-			    	}
+			    for( WebElement element : allLinks ){
 			 
-			    }
-			    catch(Exception exp)
-			    {
-			    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "Message  :  " + exp.getMessage();
-			    	System.out.println(exp_msg);
-			    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
-			    	Integer prevCount = (Integer) numExceptions.get();
-			    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
-			    }
-			    finally {
-			    	objTgtURL = null;
-			    }
-		     
-	    	}
+				    try
+				    {
+				    	String strTagName =  element.getTagName();
+				    	String strTgtURL = null;
+				    	String linkType = "";
+				    	
+				    	if (strTagName.equalsIgnoreCase("a")) {
+				    		strTgtURL = element.getAttribute("href");
+				    		linkType = "<a>";
+				    	}
+				    	else if (strTagName.equalsIgnoreCase("img")) {
+				    		strTgtURL  = element.getAttribute("src");
+				    		linkType = "<img>";
+				    	}
+				    	else if (strTagName.equalsIgnoreCase("link")) {
+				    		strTgtURL  = element.getAttribute("href");
+				    		linkType = "<link>";
+				    	}
+				    	
+				    	ResponseDataObj respData;
+				    	
+				    	if ( strTgtURL != null )
+				    	{
+				    		String msg = null;
+				    		//String noUidPwdURL = strTgtURL.replaceFirst( "(https{0,1}://)" + this.uid + ":" + this.password + "@", "$1" );
+				    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)  
+				    		
+				    		if(visitedLinkMap.containsKey(noUidPwdURL))
+				    		{
+				    			msg = (boolOptVerbose) ? 
+				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(visited)" 
+				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
+				    			
+				    			new PrintStream(f_out_ok.get()).println( msg );
+				    			
+				    		}
+				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL)) {
+				    			// external link
+				    			
+				    			msg = (boolOptVerbose) ?
+				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(external link)"
+				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
+				    			
+				    			new PrintStream(f_out_externalLinks.get()).println( msg );
+				    			Integer prevCount = (Integer) numExternalLinks.get();
+				    			numExternalLinks.set( new Integer(prevCount.intValue() + 1) );
+				    		}
+				    		else {
+				    			
+				    			// (Note)
+				    			// at this moment, objTgtURL is always null because of finally() part.
+				    			
+				    			Matcher mtch_no_http = ptn_no_http.matcher(strTgtURL);
+				    			if ( mtch_no_http.find() )  // if strTgtURL was relative.
+					    		{
+				    				objTgtURL = new URL(new URL(strRootURL), strTgtURL);
+					    		}
+				    			else {
+				    				objTgtURL = new URL(strTgtURL);
+				    			}
+				    			
+					    		respData = isLinkBroken(objTgtURL, uid, password);
+				    			visitedLinkMap.put(strTgtURL, 1);
+		    			
+				    			if( (this.boolRunAsDFSSearch == true)
+				    					&& !( strTgtURL.contains("mailto:") || strTgtURL.contains("tel:") )
+				    					&& strTagName.equalsIgnoreCase("a")
+				    					&& !stack.contains(noUidPwdURL)
+				    					&& !(strTgtURL.lastIndexOf("#") > strTgtURL.lastIndexOf("/"))
+				    					) { // Do not access to not-A-tag URL via Firefox driver.
+				    				stack.push(noUidPwdURL);
+				    			}
+					    		
+					    		msg = this.strURL 
+					    				+ "\t" + linkType 
+					    				+ "\t" + noUidPwdURL
+					    				+ "\t" + respData.getRespMsg() 
+					    				+ "\t" + respData.getRespCode();
+					    		 
+				    			if ( respData.getRespCode() >= 400 )
+				    			{
+			    					new PrintStream(f_out_error.get()).println(msg);
+			    					Integer prevCount = (Integer) numInvalidLink.get();
+				    				numInvalidLink.set(new Integer(prevCount.intValue() + 1) ); 
+				    			}
+				    			else
+				    			{
+			    					new PrintStream(f_out_ok.get()).println(msg);
+			    					Integer prevCount = (Integer) numHealthyLink.get();
+				    				numHealthyLink.set( new Integer(prevCount.intValue() + 1) );
+				    			}
+				    		}
+	
+			    			System.out.println(msg);
+		
+				    	}
+				 
+				    }
+				    catch(Exception exp)
+				    {
+				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "Message  :  " + exp.getMessage();
+				    	System.out.println(exp_msg);
+				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+				    	Integer prevCount = (Integer) numExceptions.get();
+				    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+				    }
+				    finally {
+				    	objTgtURL = null;
+				    }
+			     
+		    	}
+			}
 		    
 		}
 		catch(Exception exp)

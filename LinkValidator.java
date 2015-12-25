@@ -44,7 +44,7 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.02";
+	private static String strVersionNum = "0.03";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
@@ -53,6 +53,8 @@ public class LinkValidator {
 	private static String strRootURL		= "";
 	private static boolean boolOptAny		= false;
 	private static boolean boolOptVerbose	= false;
+	private static boolean boolOptScreencapture	= false;
+	private static boolean boolOptSkipElement	= false;
 	private static int numTimeoutSec = 60; // actually it will be *2 (e.g. if you set 60, the timeout will be 120 sec).
 	private static int numThread	= 1;
 	// (a note about numMaxThread)
@@ -104,6 +106,12 @@ public class LinkValidator {
 	}
 	public final static boolean getOptVerboseFlg() {
 		return boolOptVerbose;
+	}
+	public final static boolean getOptScreenCaptureFlg() {
+		return boolOptScreencapture;
+	}
+	public final static boolean getOptSkipElementFlg() {
+		return boolOptSkipElement;
 	}
 	public final static ConcurrentLinkedDeque<String> getStack() {
 		return stack;
@@ -170,6 +178,16 @@ public class LinkValidator {
 				.hasArg()
 				.argName("USERNAME")
 				.build();
+		Option optCapture	= Option.builder("capture")
+				.longOpt("screenshot")
+				.desc("take the page capture.")
+				.required(false)
+				.build();
+		Option optSkipElement	= Option.builder("skipelement")
+				.longOpt("no-element-check")
+				.desc("checks given url only, no elements in the page.")
+				.required(false)
+				.build();
 		Option optTimeOut	= Option.builder("o")
 				.longOpt("timeout")
 				.desc("timeout second.")
@@ -208,16 +226,18 @@ public class LinkValidator {
 				.required(false)
 				.build();
 
-		options.addOption(optAny);					// -a
-		options.addOption(optListFile);				// -f
-		options.addOption(optHelp);					// -h
-		options.addOption(optUid);					// -id
-		options.addOption(optPasswd);				// -p
-		options.addOption(optNumThread);			// -T
-		options.addOption(optTimeOut);				// -o
+		options.addOption(optAny);					// -a, -all
+		options.addOption(optListFile);				// -f, -url-list
+		options.addOption(optHelp);					// -h, -help
+		options.addOption(optUid);					// -id, -user
+		options.addOption(optCapture);			    // -capture, -screenshot
+		options.addOption(optSkipElement);			// -skipelement, -no-element-check
+		options.addOption(optPasswd);				// -p, -password
+		options.addOption(optNumThread);			// -T, -thread
+		options.addOption(optTimeOut);				// -o, -timeout
 		options.addOption(optUrl);					// -url
-		options.addOption(optVerbose);				// -v
-		options.addOption(optVersionNum);			// -V
+		options.addOption(optVerbose);				// -v, -verbose
+		options.addOption(optVersionNum);			// -V, -version
 		
 		try {
 			
@@ -245,6 +265,14 @@ public class LinkValidator {
 			// -id : User ID for BASIC auth.
 			if (cmdline.hasOption("id")) {
 				strUid = cmdline.getOptionValue("id");
+			}
+			// -capture : do not take capture.
+			if (cmdline.hasOption("capture")) {
+				boolOptScreencapture = true;
+			}
+			// -skipelement : no element link check within the page.
+			if (cmdline.hasOption("skipelement")) {
+				boolOptSkipElement = true;
 			}
 			// -p : password for BASIC auth.
 			if (cmdline.hasOption("p")) {
@@ -300,12 +328,19 @@ public class LinkValidator {
 				formatter.printHelp(strProgramName, options, true);
 				System.exit(0);
 			}
+			if ( cmdline.hasOption("a") && cmdline.hasOption("skipelement") ) {
+				System.err.println( "Cannot specify \"-a\" and \"-skipelement\" option at the same time." );
+				HelpFormatter formatter = new HelpFormatter();
+				formatter.printHelp(strProgramName, options, true);
+				System.exit(0);
+			}
 			if ( !cmdline.hasOption("f") && !cmdline.hasOption("url") ) {
 				System.err.println( "Either \"-f\" or \"-url\" must be specified." );
 				HelpFormatter formatter = new HelpFormatter();
 				formatter.printHelp(strProgramName, options, true);
 				System.exit(0);
 			}
+
 			
 			// in case given file of URL lists or given root url
 			if (cmdline.hasOption("f") || cmdline.hasOption("url")) {

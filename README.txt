@@ -8,6 +8,7 @@ o Basic behavior
         "href" in <a> tag
         "src" in <img> tag
     - also checks "href" content in <link> tag if “-a” or “—all” option was specified in command line.
+      (* "-skipelement" option skips all above link check and just browse given url(s))
     - validate given URL page and links in the page.
     - continue browsing/checking if the found link path was included in the given URL.
 
@@ -23,9 +24,10 @@ o Required software/component
 o Feature
   * automatically follows links in browsed page.
     - This program automatically browses links found in the given URL page if the link path contains the first URL.
+      -- "-skipelement" option skips all above link check and just browse given url(s)
     - You can specify urls by making a url list (a file contains one url per line).
-  * automatically takes snapshot.
-    - This program takes a snapshot of the browsed page automatically.
+  * takes page capture ("-capture" option)
+    - with the "-capture" option, this program takes a screen capture of the browsed page.
       —-  "/" character in the URL path is replaced to "_" (underscore).
       —- Other invalid characters as the windows file name such as ? <>|"(double quote) are
          also replaced to "_".
