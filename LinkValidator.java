@@ -266,7 +266,7 @@ public class LinkValidator {
 			if (cmdline.hasOption("id")) {
 				strUid = cmdline.getOptionValue("id");
 			}
-			// -capture : do not take capture.
+			// -capture : take capture.
 			if (cmdline.hasOption("capture")) {
 				boolOptScreencapture = true;
 			}
