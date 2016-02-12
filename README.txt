@@ -60,12 +60,15 @@ o How to specify URL to browse.
 o All available options
 
  -a,--all                      Also check "link" tag.
+ -capture,--screenshot         takes the page capture.
  -f,--url-list <FILE>          Specify a text file containing urls to be
                                checked.
  -h,--help                     print this help.
  -id,--user <USERNAME>         user id for the BASIC authentication.
  -p,--password <PASSWORD>      password for the BASIC authentication.
  -o, --timeout <Timeout Sec>   second for timeout.
+ -skipelement, --no-element-check
+                               checks given url only, no element in the page is checked.
  -T,--thread <NUM of Thread>   number of thread (must be an integer, less
                                than 16). 'AUTO' for available processor
                                num.
