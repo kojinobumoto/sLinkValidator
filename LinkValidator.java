@@ -44,7 +44,7 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.03";
+	private static String strVersionNum = "0.04";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
@@ -185,7 +185,7 @@ public class LinkValidator {
 				.build();
 		Option optSkipElement	= Option.builder("skipelement")
 				.longOpt("no-element-check")
-				.desc("checks given url only, no elements in the page.")
+				.desc("checks given url only, no element in the page is checked.")
 				.required(false)
 				.build();
 		Option optTimeOut	= Option.builder("o")

@@ -42,6 +42,7 @@ import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxProfile;
 
 public class RunnableLinkChecker implements Runnable {
 
@@ -375,7 +376,13 @@ public class RunnableLinkChecker implements Runnable {
 		ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
 		
 		// FireFox
-		FirefoxDriver browserDriver = new FirefoxDriver();
+		FirefoxProfile prof = new FirefoxProfile();
+		
+		// to skip the "first run" page (for FF 42.0 or higher). 
+		prof.setPreference("xpinstall.signatures.required", false);
+		prof.setPreference("toolkit.telemetry.reportingpolicy.firstRun", false);
+		
+		FirefoxDriver browserDriver = new FirefoxDriver(prof);
 		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
 		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
 		browserDriver.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
