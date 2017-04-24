@@ -18,7 +18,7 @@ o Verified Platform
 o Required software/component
   * Java 8 (JRE 1.8 or higher)
   * Selenium Client WebDriver
-  * Firefox (browses using firefox driver)
+  * Firefox (browses using firefox driver. ver 48.0 or older)
   * Apache Commons CLI (I have created this software as the CLI application)
 
 o Feature
