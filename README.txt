@@ -13,12 +13,17 @@ o Basic behavior
     - continue browsing/checking if the found link path was included in the given URL.
 
 o Verified Platform
-  * Windows 7, Mac OS X 10.10 (Yosemite) (JRE 1.8 or higher)
+  * Windows 7
+  * (ver 0.0.4 or older) Mac OS X 10.10 (Yosemite) (JRE 1.8 or higher)
 
 o Required software/component
   * Java 8 (JRE 1.8 or higher)
   * Selenium Client WebDriver
-  * Firefox (browses using firefox driver. ver 48.0 or older)
+  * Firefox
+      until ver 0.0.4 => FF 48.0 or older, and selenium 2.45
+      0.0.5 => for Selenium 3 and FF 50+ with geckodriver
+              (you need to place geckodriver into C:\\Program Files (x86)\\geckodriver\\geckodriver.exe
+              see https://github.com/seleniumhq/selenium/issues/2320 in detail.)
   * Apache Commons CLI (I have created this software as the CLI application)
 
 o Feature
@@ -28,10 +33,10 @@ o Feature
     - You can specify urls by making a url list (a file contains one url per line).
   * takes page capture ("-capture" option)
     - with the "-capture" option, this program takes a screen capture of the browsed page.
-      —-  "/" character in the URL path is replaced to "_" (underscore).
-      —- Other invalid characters as the windows file name such as ? <>|"(double quote) are
+      --  "/" character in the URL path is replaced to "_" (underscore).
+      -- Other invalid characters as the windows file name such as ? <>|"(double quote) are
          also replaced to "_".
-      —- This software does not support Chrome and InternetExplorer since the driver of those two browser
+      -- This software does not support Chrome and InternetExplorer since the driver of those two browser
           cannot take full page screenshot.
   * Multi threading. 
     The thread number, which is equal the number of simultaneously opening browser, can be specified by “-T” option.

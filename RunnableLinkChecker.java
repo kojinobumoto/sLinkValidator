@@ -382,6 +382,8 @@ public class RunnableLinkChecker implements Runnable {
 		prof.setPreference("xpinstall.signatures.required", false);
 		prof.setPreference("toolkit.telemetry.reportingpolicy.firstRun", false);
 		
+		
+		System.setProperty("webdriver.gecko.driver","C:\\Program Files (x86)\\geckodriver\\geckodriver.exe"); // for Selenium 3 and FF 50+
 		FirefoxDriver browserDriver = new FirefoxDriver(prof);
 		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
 		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?

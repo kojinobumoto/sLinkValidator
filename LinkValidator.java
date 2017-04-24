@@ -44,7 +44,7 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.04";
+	private static String strVersionNum = "0.05";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
