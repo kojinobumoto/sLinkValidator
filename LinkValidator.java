@@ -44,12 +44,13 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.05";
+	private static String strVersionNum = "0.06";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
 	static Pattern ptn_no_http	= Pattern.compile("^((?!http://).)+$");
 	
+	private static String strPathToGeckoDriver		= "";
 	private static String strRootURL		= "";
 	private static boolean boolOptAny		= false;
 	private static boolean boolOptVerbose	= false;
@@ -97,6 +98,9 @@ public class LinkValidator {
 	}
 	public final static ConcurrentHashMap<String, Integer> getVisitedLinkMap() {
 		return visitedLinkMap;
+	}
+	public final static String getPathToGeckoDriver() {
+		return strPathToGeckoDriver;
 	}
 	public final static String getRootURL() {
 		return strRootURL;
@@ -154,6 +158,12 @@ public class LinkValidator {
 		// create the options object.
 		Options options = new Options();
 
+		Option optPathToGeckoDriver = Option.builder("gecko")
+				.longOpt("path-to-gecko")
+				.desc("[Mandatory] full path to geckodriver.exe")
+				.required(true)
+				.hasArg()
+				.build();
 		Option optAny	= Option.builder( "a" )
 				.longOpt("all")
 				.desc("Also check \"link\" tag.")
@@ -226,6 +236,8 @@ public class LinkValidator {
 				.required(false)
 				.build();
 
+
+		options.addOption(optPathToGeckoDriver);	// -gecko, --path-to-gecko
 		options.addOption(optAny);					// -a, -all
 		options.addOption(optListFile);				// -f, -url-list
 		options.addOption(optHelp);					// -h, -help
@@ -239,6 +251,7 @@ public class LinkValidator {
 		options.addOption(optVerbose);				// -v, -verbose
 		options.addOption(optVersionNum);			// -V, -version
 		
+		
 		try {
 			
 			String strUid	= "";
@@ -251,7 +264,20 @@ public class LinkValidator {
 			// Parse the command line arguments.
 			CommandLine cmdline = parser.parse(options, args);
 			
-	
+
+			// -gecko (mandatory) : full path to the geckodriver binary file (e.g. [win] c:\path\to\geckodriver.exe, [mac] /path/to/geckodriver)
+			if (cmdline.hasOption("gecko")) {
+				strPathToGeckoDriver = cmdline.getOptionValue("gecko");	
+				if (strPathToGeckoDriver == null) {
+					System.out.println("Specified path to geckodriver.exe was null. Please check again.");
+					System.exit(0);
+				}
+			}
+			else {
+				System.out.println("You Must Specify full path to geckodriver.exe. e.g. '-gecko C:\\Program Files (x86)\\geckodriver\\geckodriver.exe'");
+				System.exit(0);
+			}
+			
 			// -a : any flag. (checks <link> tag's href)
 			if (cmdline.hasOption("a")) {
 				boolOptAny = true;

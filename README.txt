@@ -24,6 +24,9 @@ o Required software/component
       0.0.5 => for Selenium 3 and FF 50+ with geckodriver
               (you need to place geckodriver into C:\\Program Files (x86)\\geckodriver\\geckodriver.exe
               see https://github.com/seleniumhq/selenium/issues/2320 in detail.)
+      0.0.6 => Now you must specify the path to the geckodriver binary.
+               e.g. [win] -gecko "C:\Program Files (x86)\geckodriver\geckodriver.exe"
+                    [mac]-gecko /path/to/geckodriver
   * Apache Commons CLI (I have created this software as the CLI application)
 
 o Feature
@@ -49,6 +52,9 @@ o How to use.
 
   (example)
   $> java -jar SLinkValidator.jar -url http://a.b.com/
+  
+  (ver 0.0.6)
+  $> java -jar SLinkValidator.jar -gecko "C:\Program Files (x86)\geckodriver\geckodriver.exe" -url http://a.b.com/
 
 
 o How to specify URL to browse.
@@ -63,6 +69,9 @@ o How to specify URL to browse.
     The url should be listed one per line.
 
 o All available options
+
+ -gecko, --path-to-gecko (mandatory)
+                               Specify the full path to the geckodriver binary. 
 
  -a,--all                      Also check "link" tag.
  -capture,--screenshot         takes the page capture.

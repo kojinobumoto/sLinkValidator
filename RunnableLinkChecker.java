@@ -366,6 +366,7 @@ public class RunnableLinkChecker implements Runnable {
 		strFname_exceptions.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__exceptions.txt");
 
 		// shared variables from BrokenLinkChecker class.
+		String strPathToGeckoDriver = LinkValidator.getPathToGeckoDriver();
 		String strRootURL	= LinkValidator.getRootURL();
 		boolean boolOptAny	= LinkValidator.getOptAny();
 		boolean boolOptVerbose	= LinkValidator.getOptVerboseFlg();
@@ -383,7 +384,8 @@ public class RunnableLinkChecker implements Runnable {
 		prof.setPreference("toolkit.telemetry.reportingpolicy.firstRun", false);
 		
 		
-		System.setProperty("webdriver.gecko.driver","C:\\Program Files (x86)\\geckodriver\\geckodriver.exe"); // for Selenium 3 and FF 50+
+		//System.setProperty("webdriver.gecko.driver","C:\\Program Files (x86)\\geckodriver\\geckodriver.exe"); // for Selenium 3 and FF 50+
+		System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
 		FirefoxDriver browserDriver = new FirefoxDriver(prof);
 		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
 		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
