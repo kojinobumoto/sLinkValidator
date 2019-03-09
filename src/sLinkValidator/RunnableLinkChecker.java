@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,7 +43,6 @@ import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
-import org.openqa.selenium.firefox.FirefoxProfile;
 
 public class RunnableLinkChecker implements Runnable {
 
@@ -51,7 +51,7 @@ public class RunnableLinkChecker implements Runnable {
 	private String uid;
 	private String password;
 	private int numTimeoutSec;
-	private boolean boolRunAsDFSSearch;
+	private boolean boolRunAsBFSSearch;
 	
 	static Pattern ptn_http		= Pattern.compile("^https{0,1}://");
 	static Pattern ptn_no_http	= Pattern.compile("^((?!https{0,1}://).)+$");
@@ -76,14 +76,14 @@ public class RunnableLinkChecker implements Runnable {
 								, String __uid
 								, String __password
 								, int __timeout
-								, boolean __boolRunAsDFSSearch) throws FileNotFoundException {
+								, boolean __boolRunAsBFSSearch) throws FileNotFoundException {
 		
 		this.strThreadID	= __strThreadID;
 		this.strURL			= __url;
 		this.uid			= __uid;
 		this.password		= __password;
 		this.numTimeoutSec	= __timeout;
-		this.boolRunAsDFSSearch			= __boolRunAsDFSSearch;
+		this.boolRunAsBFSSearch			= __boolRunAsBFSSearch;
 		
 		numHealthyLink	= new ThreadLocal<Integer>() {
 							@Override protected Integer initialValue() {
@@ -309,14 +309,19 @@ public class RunnableLinkChecker implements Runnable {
 	private void appendAndDeleteTmpFile(FileOutputStream f_to, String strFname_from) {
 		try {
 			
+			int waitMin = 1000; // 1 sec
+			int waitMax = 5000; // 5 sec
+			
 			FileInputStream f_from = new FileInputStream(strFname_from);
 			
 		    // obtain Lock of the output file
 		    FileLock lock = f_to.getChannel().tryLock();
 		    
 		    while (lock == null) {
+		    	// wait randomly between 1 sec to 5 sec.
+		    	int waitMillSec = ThreadLocalRandom.current().nextInt(waitMin, waitMax + 1);
 		    	lock = f_to.getChannel().tryLock();
-				Thread.sleep(1000);
+				Thread.sleep(waitMillSec);
 		    }
 		    
 		    try {
@@ -374,19 +379,13 @@ public class RunnableLinkChecker implements Runnable {
 		boolean boolOptSkipElement = LinkValidator.getOptSkipElementFlg();
 
 		ConcurrentHashMap<String, Integer> visitedLinkMap = LinkValidator.getVisitedLinkMap();
-		ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
-		
-		// FireFox
-		FirefoxProfile prof = new FirefoxProfile();
-		
-		// to skip the "first run" page (for FF 42.0 or higher). 
-		prof.setPreference("xpinstall.signatures.required", false);
-		prof.setPreference("toolkit.telemetry.reportingpolicy.firstRun", false);
+		//ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
+		ConcurrentLinkedDeque<String> deque = LinkValidator.getDeque();
 		
 		
 		//System.setProperty("webdriver.gecko.driver","C:\\Program Files (x86)\\geckodriver\\geckodriver.exe"); // for Selenium 3 and FF 50+
 		System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
-		FirefoxDriver browserDriver = new FirefoxDriver(prof);
+		FirefoxDriver browserDriver = new FirefoxDriver();
 		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
 		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
 		browserDriver.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
@@ -507,13 +506,14 @@ public class RunnableLinkChecker implements Runnable {
 					    		respData = isLinkBroken(objTgtURL, uid, password);
 				    			visitedLinkMap.put(strTgtURL, 1);
 		    			
-				    			if( (this.boolRunAsDFSSearch == true)
+				    			if( (this.boolRunAsBFSSearch == true)
 				    					&& !( strTgtURL.contains("mailto:") || strTgtURL.contains("tel:") )
 				    					&& strTagName.equalsIgnoreCase("a")
-				    					&& !stack.contains(noUidPwdURL)
+				    					&& !deque.contains(noUidPwdURL)
 				    					&& !(strTgtURL.lastIndexOf("#") > strTgtURL.lastIndexOf("/"))
 				    					) { // Do not access to not-A-tag URL via Firefox driver.
-				    				stack.push(noUidPwdURL);
+				    				//stack.push(noUidPwdURL);  // stack
+				    				deque.addLast(noUidPwdURL);  // queue
 				    			}
 					    		
 					    		msg = this.strURL 

@@ -44,7 +44,7 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.06";
+	private static String strVersionNum = "0.07";
 	private static String strProgramName = "SLinkValidator";
 
 	static Pattern ptn_http		= Pattern.compile("http://");
@@ -77,8 +77,9 @@ public class LinkValidator {
 	private static int numBrowsedPages	= 0;
 	
 	// stack for DFS search (ConcurrentLinkedDeque class's deque).
-	private static boolean boolRunAsDFSSearch = false;
-	private static ConcurrentLinkedDeque<String> stack = new ConcurrentLinkedDeque<String>();
+	private static boolean boolRunAsBFSSearch = false;
+	//private static ConcurrentLinkedDeque<String> stack = new ConcurrentLinkedDeque<String>();
+	private static ConcurrentLinkedDeque<String> deque = new ConcurrentLinkedDeque<String>();
 	
 	//////////////////////////////
 	//
@@ -117,8 +118,13 @@ public class LinkValidator {
 	public final static boolean getOptSkipElementFlg() {
 		return boolOptSkipElement;
 	}
+	/*
 	public final static ConcurrentLinkedDeque<String> getStack() {
 		return stack;
+	}
+	*/
+	public final static ConcurrentLinkedDeque<String> getDeque() {
+		return deque;
 	}
 	public final static int getNumTimeoutSec() {
 		return numTimeoutSec;
@@ -401,19 +407,19 @@ public class LinkValidator {
 			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + "exceptions-" + timeStamp + ".txt", true);
 			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + "external_links-" + timeStamp + ".txt", true);
 
-			    FileOutputStream f_out_stackcontents = null;
+			    FileOutputStream f_out_dequecontents = null;
 				ExecutorService executorService = Executors.newFixedThreadPool(numThread);
 				
 				String url = "";
 				
 				try {
 					
-					f_out_stackcontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".txt", true);
+					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".txt", true);
 					
 					if (cmdline.hasOption("f")) {
 						// given file of url lists
 						
-						boolRunAsDFSSearch = false;
+						boolRunAsBFSSearch = false;
 						
 						String urlListFile = cmdline.getOptionValue("f");
 						
@@ -426,7 +432,7 @@ public class LinkValidator {
 					    BufferedReader f_in = new BufferedReader(new FileReader(urlListFile));
 						
 						while( (url = f_in.readLine()) != null ) {		
-							stack.addLast(url);
+							deque.addLast(url);
 						}
 						
 						f_in.close();
@@ -436,26 +442,28 @@ public class LinkValidator {
 						// root url was given
 						
 						//DFS
-						boolRunAsDFSSearch = true;
+						boolRunAsBFSSearch = true;
 						strRootURL = cmdline.getOptionValue("url");
 						
-						stack.push(strRootURL);
-						new PrintStream(f_out_stackcontents).println("[Root URL] is : " + strRootURL + "\n");
+						//stack.push(strRootURL);
+						deque.add(strRootURL);
+						new PrintStream(f_out_dequecontents).println("[Root URL] is : " + strRootURL + "\n");
 						
 					}
 						
 					
 					// run thread(s).
-					while(!stack.isEmpty()) {
+					//while(!stack.isEmpty()) {
+					while(!deque.isEmpty()) {
 						
 						if (numThread == 1) {
 							// In case numThread is 1, perform the check by the safest way.
 							
-							url = stack.pop();
+							url = deque.pop();
 							
-							new PrintStream(f_out_stackcontents).println(url);
+							new PrintStream(f_out_dequecontents).println(url);
 
-							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsDFSSearch);
+							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsBFSSearch);
 
 							Thread thread_1 = new Thread( runnable, Integer.toString(numBrowsedPages) );
 							thread_1.start();
@@ -467,15 +475,15 @@ public class LinkValidator {
 						else {
 							
 							int numThreadCnt = numThread;
-							int numArrSize = ( numThread <= stack.size()) ? numThread : stack.size();
+							int numArrSize = ( numThread <= deque.size()) ? numThread : deque.size();
 							List<Callable<Object>> todo = new ArrayList<Callable<Object>>(numArrSize);
 							
-							while(!stack.isEmpty() || (numThreadCnt > 0 && stack.size() >= numThreadCnt ) ) {
+							while(!deque.isEmpty() || (numThreadCnt > 0 && deque.size() >= numThreadCnt ) ) {
 								
-								url = stack.pop();
+								url = deque.pop();
 								
-								new PrintStream(f_out_stackcontents).println(url);
-								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsDFSSearch);
+								new PrintStream(f_out_dequecontents).println(url);
+								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsBFSSearch);
 								//executorService.execute(runnable);
 								todo.add(Executors.callable(runnable));
 								
@@ -509,12 +517,16 @@ public class LinkValidator {
 						}
 					}
 					
-					new PrintStream(f_out_stackcontents).println("Total Browsed Pages = " + numBrowsedPages);
-					new PrintStream(f_out_stackcontents).println(" ");
+					//new PrintStream(f_out_dequecontents).println("Total Browsed Pages = " + numBrowsedPages);
+					PrintStream printStream = new PrintStream(f_out_dequecontents);
+					printStream.println("Total Browsed Pages = " + numBrowsedPages);
+					printStream.close();
+					
+					new PrintStream(f_out_dequecontents).println(" ");
 								
 				}
 				finally {
-					try { f_out_stackcontents.close(); } catch (Exception e) {}
+					try { f_out_dequecontents.close(); } catch (Exception e) {}
 				}
 				
 				long endTime = System.currentTimeMillis();
