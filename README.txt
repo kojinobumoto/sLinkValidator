@@ -88,6 +88,7 @@ o All available options
                                num.
  -url <URL>                    Base URL to be checked.
  -v,--verbose                  verbose output mode.
+ -s,--sitemap                  sitemap mode (follows only <a> tag）
  -V,--version                  print version number. 
 
 o Output

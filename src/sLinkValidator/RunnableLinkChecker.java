@@ -22,10 +22,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.channels.FileLock;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -377,6 +379,7 @@ public class RunnableLinkChecker implements Runnable {
 		boolean boolOptVerbose	= LinkValidator.getOptVerboseFlg();
 		boolean boolOptCapture = LinkValidator.getOptScreenCaptureFlg();
 		boolean boolOptSkipElement = LinkValidator.getOptSkipElementFlg();
+		boolean boolOptSitemapMode = LinkValidator.getSitemapModeFlg();
 
 		ConcurrentHashMap<String, Integer> visitedLinkMap = LinkValidator.getVisitedLinkMap();
 		//ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
@@ -452,11 +455,11 @@ public class RunnableLinkChecker implements Runnable {
 				    		strTgtURL = element.getAttribute("href");
 				    		linkType = "<a>";
 				    	}
-				    	else if (strTagName.equalsIgnoreCase("img")) {
+				    	else if (!boolOptSitemapMode && strTagName.equalsIgnoreCase("img")) {
 				    		strTgtURL  = element.getAttribute("src");
 				    		linkType = "<img>";
 				    	}
-				    	else if (strTagName.equalsIgnoreCase("link")) {
+				    	else if (!boolOptSitemapMode && strTagName.equalsIgnoreCase("link")) {
 				    		strTgtURL  = element.getAttribute("href");
 				    		linkType = "<link>";
 				    	}
@@ -467,23 +470,38 @@ public class RunnableLinkChecker implements Runnable {
 				    	{
 				    		String msg = null;
 				    		//String noUidPwdURL = strTgtURL.replaceFirst( "(https{0,1}://)" + this.uid + ":" + this.password + "@", "$1" );
-				    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)  
+				    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)
+				    		String noUidPwdURL_decoded = java.net.URLDecoder.decode(noUidPwdURL, StandardCharsets.UTF_8.name());
 				    		
-				    		if(visitedLinkMap.containsKey(noUidPwdURL))
+				    		//if(visitedLinkMap.containsKey(noUidPwdURL))
+				    		if(visitedLinkMap.containsKey(noUidPwdURL_decoded))
 				    		{
+				    			/*
 				    			msg = (boolOptVerbose) ? 
 				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(visited)" 
 				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
+				    			*/
+				    			
+				    			msg = (boolOptVerbose) ? 
+				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(visited)" 
+				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded;
 				    			
 				    			new PrintStream(f_out_ok.get()).println( msg );
 				    			
 				    		}
-				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL)) {
+				    		//else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL)) {
+				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL_decoded)) {
 				    			// external link
 				    			
+				    			/*
 				    			msg = (boolOptVerbose) ?
 				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(external link)"
 				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
+				    			*/
+				    			
+				    			msg = (boolOptVerbose) ?
+				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(external link)"
+				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded;
 				    			
 				    			new PrintStream(f_out_externalLinks.get()).println( msg );
 				    			Integer prevCount = (Integer) numExternalLinks.get();
@@ -504,21 +522,32 @@ public class RunnableLinkChecker implements Runnable {
 				    			}
 				    			
 					    		respData = isLinkBroken(objTgtURL, uid, password);
-				    			visitedLinkMap.put(strTgtURL, 1);
+				    			// visitedLinkMap.put(strTgtURL, 1);
+					    		visitedLinkMap.put(noUidPwdURL_decoded, 1);
 		    			
 				    			if( (this.boolRunAsBFSSearch == true)
 				    					&& !( strTgtURL.contains("mailto:") || strTgtURL.contains("tel:") )
 				    					&& strTagName.equalsIgnoreCase("a")
-				    					&& !deque.contains(noUidPwdURL)
-				    					&& !(strTgtURL.lastIndexOf("#") > strTgtURL.lastIndexOf("/"))
+				    					// && !deque.contains(noUidPwdURL)
+				    					&& !deque.contains(noUidPwdURL_decoded)
+				    					&& !( strTgtURL.lastIndexOf("#") > strTgtURL.lastIndexOf("/") )
+				    					&& !( strTgtURL.endsWith(".png") || strTgtURL.endsWith(".jpg") || strTgtURL.endsWith(".gif") )
 				    					) { // Do not access to not-A-tag URL via Firefox driver.
 				    				//stack.push(noUidPwdURL);  // stack
-				    				deque.addLast(noUidPwdURL);  // queue
+				    				//deque.addLast(noUidPwdURL);  // queue
+				    				deque.addLast(noUidPwdURL_decoded);  // queue
 				    			}
 					    		
+				    			/*
 					    		msg = this.strURL 
 					    				+ "\t" + linkType 
 					    				+ "\t" + noUidPwdURL
+					    				+ "\t" + respData.getRespMsg() 
+					    				+ "\t" + respData.getRespCode();
+					    		*/
+					    		msg = this.strURL 
+					    				+ "\t" + linkType 
+					    				+ "\t" + noUidPwdURL_decoded
 					    				+ "\t" + respData.getRespMsg() 
 					    				+ "\t" + respData.getRespCode();
 					    		 
@@ -541,6 +570,16 @@ public class RunnableLinkChecker implements Runnable {
 				    	}
 				 
 				    }
+				    catch (UnsupportedEncodingException e) {
+		    		    // not going to happen - value came from JDK's own StandardCharsets
+				    	// just for noUidPwdURL_decoded in case something wrong happens
+				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "[UnsupportedEncodingException] Message  :  " + e.getMessage();
+				    	System.out.println(exp_msg);
+				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+				    	Integer prevCount = (Integer) numExceptions.get();
+				    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+				    	
+		    		}
 				    catch(Exception exp)
 				    {
 				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "Message  :  " + exp.getMessage();

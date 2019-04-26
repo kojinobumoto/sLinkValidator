@@ -44,8 +44,9 @@ import org.apache.commons.cli.ParseException;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.07";
+	private static String strVersionNum = "0.08";
 	private static String strProgramName = "SLinkValidator";
+	private static String OS = null;
 
 	static Pattern ptn_http		= Pattern.compile("http://");
 	static Pattern ptn_no_http	= Pattern.compile("^((?!http://).)+$");
@@ -56,6 +57,7 @@ public class LinkValidator {
 	private static boolean boolOptVerbose	= false;
 	private static boolean boolOptScreencapture	= false;
 	private static boolean boolOptSkipElement	= false;
+	private static boolean boolOptSitemapMode	= false;
 	private static int numTimeoutSec = 60; // actually it will be *2 (e.g. if you set 60, the timeout will be 120 sec).
 	private static int numThread	= 1;
 	// (a note about numMaxThread)
@@ -117,6 +119,9 @@ public class LinkValidator {
 	}
 	public final static boolean getOptSkipElementFlg() {
 		return boolOptSkipElement;
+	}
+	public final static boolean getSitemapModeFlg() {
+		return boolOptSitemapMode;
 	}
 	/*
 	public final static ConcurrentLinkedDeque<String> getStack() {
@@ -231,6 +236,12 @@ public class LinkValidator {
 				.hasArg()
 				.argName("URL")
 				.build();
+		Option optSitemapMode	= Option.builder("s")
+				.longOpt("sitemap")
+				.desc("Sitemap mode. Follows only <a> tag.")
+				.required(false)
+				.argName("SITEMAP")
+				.build();
 		Option optVerbose	= Option.builder("v")
 				.longOpt("verbose")
 				.desc("verbose output mode.")
@@ -254,6 +265,7 @@ public class LinkValidator {
 		options.addOption(optNumThread);			// -T, -thread
 		options.addOption(optTimeOut);				// -o, -timeout
 		options.addOption(optUrl);					// -url
+		options.addOption(optSitemapMode);			// -s, -sitemap
 		options.addOption(optVerbose);				// -v, -verbose
 		options.addOption(optVersionNum);			// -V, -version
 		
@@ -314,6 +326,10 @@ public class LinkValidator {
 			if (cmdline.hasOption("o")) {
 				numTimeoutSec = Integer.parseInt(cmdline.getOptionValue("o"))/2;
 			}
+			// -s : sitemap Mode (follows only <a> tag).
+			if (cmdline.hasOption("s")) {
+				boolOptSitemapMode = true;
+			}
 			// -T : num of thread.
 			if (cmdline.hasOption("T")) {
 				if ( cmdline.getOptionValue("T").equalsIgnoreCase("auto") ) {
@@ -362,6 +378,18 @@ public class LinkValidator {
 			}
 			if ( cmdline.hasOption("a") && cmdline.hasOption("skipelement") ) {
 				System.err.println( "Cannot specify \"-a\" and \"-skipelement\" option at the same time." );
+				HelpFormatter formatter = new HelpFormatter();
+				formatter.printHelp(strProgramName, options, true);
+				System.exit(0);
+			}
+			if ( cmdline.hasOption("a") && cmdline.hasOption("s") ) {
+				System.err.println( "Cannot specify \"-a\" (any) and \"-s\" (sitemapmode) option at the same time." );
+				HelpFormatter formatter = new HelpFormatter();
+				formatter.printHelp(strProgramName, options, true);
+				System.exit(0);
+			}
+			if ( cmdline.hasOption("skipelement") && cmdline.hasOption("s") ) {
+				System.err.println( "Cannot specify \"-skipelement\" and \"-s\" (sitemapmode) option at the same time." );
 				HelpFormatter formatter = new HelpFormatter();
 				formatter.printHelp(strProgramName, options, true);
 				System.exit(0);
@@ -565,6 +593,14 @@ public class LinkValidator {
 	        HelpFormatter formatter = new HelpFormatter();
 			formatter.printHelp("BrokenLinkChecker", options);
 			System.exit(0);
+		}
+		finally {
+			
+			OS = System.getProperty("os.name");
+			// cleanup the geckodriver in case Windows
+			if ( OS.startsWith("Windows") ) {
+				Runtime.getRuntime().exec("taskkill /F /IM geckodriver.exe /T");
+			}
 		}
 		   
 	}
