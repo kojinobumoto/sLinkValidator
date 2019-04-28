@@ -31,8 +31,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,7 +54,6 @@ public class RunnableLinkChecker implements Runnable {
 	private String strURL;
 	private String uid;
 	private String password;
-	private int numTimeoutSec;
 	private boolean boolRunAsBFSSearch;
 	
 	static Pattern ptn_http		= Pattern.compile("^https{0,1}://");
@@ -77,14 +78,12 @@ public class RunnableLinkChecker implements Runnable {
 								, String __url
 								, String __uid
 								, String __password
-								, int __timeout
 								, boolean __boolRunAsBFSSearch) throws FileNotFoundException {
 		
 		this.strThreadID	= __strThreadID;
 		this.strURL			= __url;
 		this.uid			= __uid;
 		this.password		= __password;
-		this.numTimeoutSec	= __timeout;
 		this.boolRunAsBFSSearch			= __boolRunAsBFSSearch;
 		
 		numHealthyLink	= new ThreadLocal<Integer>() {
@@ -134,7 +133,6 @@ public class RunnableLinkChecker implements Runnable {
 								}
 							};
 							
-		
 		f_out_ok	= new ThreadLocal<FileOutputStream>() {
 							@Override protected FileOutputStream initialValue() {
 								FileOutputStream fos = null;
@@ -187,7 +185,6 @@ public class RunnableLinkChecker implements Runnable {
 										return fos;
 									}
 								};
-		
 
 	}
 	
@@ -312,23 +309,29 @@ public class RunnableLinkChecker implements Runnable {
 		try {
 			
 			int waitMin = 1000; // 1 sec
-			int waitMax = 5000; // 5 sec
+			int waitMax = 10000; // 10 sec
 			
-			FileInputStream f_from = new FileInputStream(strFname_from);
-			
+			FileInputStream f_from = new FileInputStream(strFname_from);  
+		    FileLock lock = null;
+		    
 		    // obtain Lock of the output file
-		    FileLock lock = f_to.getChannel().tryLock();
-		    
-		    while (lock == null) {
-		    	// wait randomly between 1 sec to 5 sec.
+		    while ( (lock = f_to.getChannel().tryLock() ) == null) {
+		    	// wait randomly between 1 sec to 10 sec.
 		    	int waitMillSec = ThreadLocalRandom.current().nextInt(waitMin, waitMax + 1);
-		    	lock = f_to.getChannel().tryLock();
-				Thread.sleep(waitMillSec);
+		    	Thread.sleep(waitMillSec);
 		    }
-		    
+
 		    try {
 		    	BufferedInputStream input = new BufferedInputStream(f_from);
 				IOUtils.copy(input, f_to);
+		    }
+		    catch (Exception e) {
+		    	e.printStackTrace();
+				String exp_msg = "Exception when copying in appendAndDeleteTmpFile() : " + e.getMessage();
+		    	System.out.println(exp_msg);
+		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+		    	Integer prevCount = (Integer) numExceptions.get();
+		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
 		    }
 		    finally {
 		    	lock.release();
@@ -351,7 +354,7 @@ public class RunnableLinkChecker implements Runnable {
 		}
 		catch (Exception e) {
 			e.printStackTrace();
-			String exp_msg = "Exception in appendFile() : " + e.getMessage();
+			String exp_msg = "Exception in appendAndDeleteTmpFile() : " + e.getMessage();
 	    	System.out.println(exp_msg);
 	    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
 	    	Integer prevCount = (Integer) numExceptions.get();
@@ -373,7 +376,6 @@ public class RunnableLinkChecker implements Runnable {
 		strFname_exceptions.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__exceptions.txt");
 
 		// shared variables from BrokenLinkChecker class.
-		String strPathToGeckoDriver = LinkValidator.getPathToGeckoDriver();
 		String strRootURL	= LinkValidator.getRootURL();
 		boolean boolOptAny	= LinkValidator.getOptAny();
 		boolean boolOptVerbose	= LinkValidator.getOptVerboseFlg();
@@ -384,14 +386,9 @@ public class RunnableLinkChecker implements Runnable {
 		ConcurrentHashMap<String, Integer> visitedLinkMap = LinkValidator.getVisitedLinkMap();
 		//ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
 		ConcurrentLinkedDeque<String> deque = LinkValidator.getDeque();
+		ConcurrentLinkedDeque<FirefoxDriver> dqBrowserDrivers = LinkValidator.getDQBrowserDrivers();
 		
-		
-		//System.setProperty("webdriver.gecko.driver","C:\\Program Files (x86)\\geckodriver\\geckodriver.exe"); // for Selenium 3 and FF 50+
-		System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
-		FirefoxDriver browserDriver = new FirefoxDriver();
-		browserDriver.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
-		browserDriver.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
-		browserDriver.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
+		FirefoxDriver browserDriver = dqBrowserDrivers.pop();
 		
 		try {
 			
@@ -399,7 +396,7 @@ public class RunnableLinkChecker implements Runnable {
 			f_out_error.set(new FileOutputStream(strFname_error.get()));
 		    f_out_externalLinks.set(new FileOutputStream(strFname_externalLinks.get()));
 		    f_out_exceptions.set(new FileOutputStream(strFname_exceptions.get()));
-			
+		    
 			System.out.println("[Current Target] : " + this.strURL);
 			new PrintStream(f_out_ok.get()).println( "[Current Target] : " + this.strURL );
 			
@@ -408,7 +405,6 @@ public class RunnableLinkChecker implements Runnable {
 			String url_get = "";
 			
 			if ( this.uid != "" || this.password != "") {
-				//url_get = this.strURL.replaceFirst( "(https{0,1}://)", "$1"+ this.uid +":"+ this.password +"@" );
 				url_get = this.strURL.replaceFirst( "(" + strPtnProtocol + ")", "$1"+ this.uid +":"+ this.password +"@" );  // add id and pass to URL (e.g. https{0,1}:// -> https{0,1}://uid:password@ )
 			}
 			else {
@@ -440,7 +436,6 @@ public class RunnableLinkChecker implements Runnable {
 			    
 			    System.out.println("Total number of elements found " + allLinks.size());
 			    new PrintStream(f_out_ok.get()).println( "Total number of elements found " + allLinks.size() );
-		    
 			    URL objTgtURL = null;
 	
 			    for( WebElement element : allLinks ){
@@ -473,15 +468,9 @@ public class RunnableLinkChecker implements Runnable {
 				    		String noUidPwdURL = strTgtURL.replaceFirst( "(" + strPtnProtocol + ")" + this.uid + ":" + this.password + "@", "$1" ); // trim uid and password (e.g. https{0,1}://uid:password@ -> https{0,1}://)
 				    		String noUidPwdURL_decoded = java.net.URLDecoder.decode(noUidPwdURL, StandardCharsets.UTF_8.name());
 				    		
-				    		//if(visitedLinkMap.containsKey(noUidPwdURL))
 				    		if(visitedLinkMap.containsKey(noUidPwdURL_decoded))
 				    		{
-				    			/*
-				    			msg = (boolOptVerbose) ? 
-				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(visited)" 
-				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
-				    			*/
-				    			
+
 				    			msg = (boolOptVerbose) ? 
 				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(visited)" 
 				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded;
@@ -489,16 +478,9 @@ public class RunnableLinkChecker implements Runnable {
 				    			new PrintStream(f_out_ok.get()).println( msg );
 				    			
 				    		}
-				    		//else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL)) {
 				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL_decoded)) {
 				    			// external link
-				    			
-				    			/*
-				    			msg = (boolOptVerbose) ?
-				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL + "\t" + "(external link)"
-				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL;
-				    			*/
-				    			
+	
 				    			msg = (boolOptVerbose) ?
 				    					this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(external link)"
 				    					: this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded;
@@ -538,13 +520,6 @@ public class RunnableLinkChecker implements Runnable {
 				    				deque.addLast(noUidPwdURL_decoded);  // queue
 				    			}
 					    		
-				    			/*
-					    		msg = this.strURL 
-					    				+ "\t" + linkType 
-					    				+ "\t" + noUidPwdURL
-					    				+ "\t" + respData.getRespMsg() 
-					    				+ "\t" + respData.getRespCode();
-					    		*/
 					    		msg = this.strURL 
 					    				+ "\t" + linkType 
 					    				+ "\t" + noUidPwdURL_decoded
@@ -575,7 +550,7 @@ public class RunnableLinkChecker implements Runnable {
 				    	// just for noUidPwdURL_decoded in case something wrong happens
 				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "[UnsupportedEncodingException] Message  :  " + e.getMessage();
 				    	System.out.println(exp_msg);
-				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+				    	new PrintStream(f_out_exceptions.get(), true, StandardCharsets.UTF_8.toString()).println(exp_msg);
 				    	Integer prevCount = (Integer) numExceptions.get();
 				    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
 				    	
@@ -584,7 +559,7 @@ public class RunnableLinkChecker implements Runnable {
 				    {
 				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "Message  :  " + exp.getMessage();
 				    	System.out.println(exp_msg);
-				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+				    	new PrintStream(f_out_exceptions.get(), true, StandardCharsets.UTF_8.toString()).println(exp_msg);
 				    	Integer prevCount = (Integer) numExceptions.get();
 				    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
 				    }
@@ -605,7 +580,9 @@ public class RunnableLinkChecker implements Runnable {
 	    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
 		}
 		finally {
-			browserDriver.close();
+			//browserDriver.close();
+			// push back browserdriver to drivers-dequeue to reuse
+			dqBrowserDrivers.addLast(browserDriver);
 			
 			// add obtained numbers to values in main class.
 		    LinkValidator.addAndGetNumHealthyLink(numHealthyLink.get());
@@ -626,11 +603,70 @@ public class RunnableLinkChecker implements Runnable {
 		    	Integer prevCount = (Integer) numExceptions.get();
 		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
 			}
+					
+			Lock lock = new ReentrantLock(true); // fair=true
+			int numWaitSec = LinkValidator.getNumTimeoutSec() + 30; // wait for a bit more than browser's timeout.
 			
-		    appendAndDeleteTmpFile(LinkValidator.getFStreamOutOk(), strFname_ok.get());
-		    appendAndDeleteTmpFile(LinkValidator.getFStreamOutError(), strFname_error.get());
-		    appendAndDeleteTmpFile(LinkValidator.getFStreamOutExternalSites(), strFname_externalLinks.get());
-		    appendAndDeleteTmpFile(LinkValidator.getFStreamOutExceptions(), strFname_exceptions.get());
+			try {
+				//lock.lock();
+				lock.tryLock(numWaitSec, TimeUnit.SECONDS);
+				appendAndDeleteTmpFile(LinkValidator.getFStreamOutOk(), strFname_ok.get());
+			} catch (InterruptedException exp_ok) {
+				exp_ok.printStackTrace();
+				exp_msg = "[appendAndDeleteTmpFile for f_out_ok] could not get lock for " + strFname_ok.get() + " .\tMessage  :  " + exp_ok.getMessage();
+		    	System.out.println(exp_msg);
+		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+		    	Integer prevCount = (Integer) numExceptions.get();
+		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+			} finally {
+				lock.unlock();
+			}
+			
+			try {
+				//lock.lock();
+				lock.tryLock(numWaitSec, TimeUnit.SECONDS);
+				appendAndDeleteTmpFile(LinkValidator.getFStreamOutError(), strFname_error.get());
+			} catch (InterruptedException exp_err) {
+				exp_err.printStackTrace();
+				exp_msg = "[appendAndDeleteTmpFile for f_out_error] could not get lock for " + strFname_error.get() + " .\tMessage  :  " + exp_err.getMessage();
+		    	System.out.println(exp_msg);
+		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+		    	Integer prevCount = (Integer) numExceptions.get();
+		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+			} finally {
+				lock.unlock();
+			}
+			
+			try {
+				//lock.lock();
+				lock.tryLock(numWaitSec, TimeUnit.SECONDS);
+				appendAndDeleteTmpFile(LinkValidator.getFStreamOutExternalSites(), strFname_externalLinks.get());
+			} catch (InterruptedException exp_ext) {
+				exp_ext.printStackTrace();
+				exp_msg = "[appendAndDeleteTmpFile for f_out_externalLinks] could not get lock for " + strFname_externalLinks.get() + " .\tMessage  :  " + exp_ext.getMessage();
+		    	System.out.println(exp_msg);
+		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+		    	Integer prevCount = (Integer) numExceptions.get();
+		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+			} finally {
+				lock.unlock();
+			}
+			
+			try {
+				//lock.lock();
+				lock.tryLock(numWaitSec, TimeUnit.SECONDS);
+				appendAndDeleteTmpFile(LinkValidator.getFStreamOutExceptions(), strFname_exceptions.get());
+			} catch (InterruptedException exp_exp) {
+				exp_exp.printStackTrace();
+				exp_msg = "[appendAndDeleteTmpFile for f_out_exceptions] could not get lock for " + strFname_exceptions.get() + " .\tMessage  :  " + exp_exp.getMessage();
+		    	System.out.println(exp_msg);
+		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+		    	Integer prevCount = (Integer) numExceptions.get();
+		    	numExceptions.set( new Integer(prevCount.intValue() + 1) );
+			} finally {
+				lock.unlock();
+			}
+			
 
 		}
 		

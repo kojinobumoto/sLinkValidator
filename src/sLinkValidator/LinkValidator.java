@@ -40,11 +40,12 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.openqa.selenium.firefox.FirefoxDriver;
  
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.08";
+	private static String strVersionNum = "0.09";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -78,10 +79,11 @@ public class LinkValidator {
 	private static AtomicInteger numExceptions		= new AtomicInteger(0);
 	private static int numBrowsedPages	= 0;
 	
-	// stack for DFS search (ConcurrentLinkedDeque class's deque).
+	// stack for BFS search (ConcurrentLinkedDeque class's deque).
 	private static boolean boolRunAsBFSSearch = false;
 	//private static ConcurrentLinkedDeque<String> stack = new ConcurrentLinkedDeque<String>();
 	private static ConcurrentLinkedDeque<String> deque = new ConcurrentLinkedDeque<String>();
+	private static ConcurrentLinkedDeque<FirefoxDriver> dqBrowserDrivers = new ConcurrentLinkedDeque<FirefoxDriver>();
 	
 	//////////////////////////////
 	//
@@ -102,9 +104,11 @@ public class LinkValidator {
 	public final static ConcurrentHashMap<String, Integer> getVisitedLinkMap() {
 		return visitedLinkMap;
 	}
+	/*
 	public final static String getPathToGeckoDriver() {
 		return strPathToGeckoDriver;
 	}
+	*/
 	public final static String getRootURL() {
 		return strRootURL;
 	}
@@ -130,6 +134,9 @@ public class LinkValidator {
 	*/
 	public final static ConcurrentLinkedDeque<String> getDeque() {
 		return deque;
+	}
+	public final static ConcurrentLinkedDeque<FirefoxDriver> getDQBrowserDrivers() {
+		return dqBrowserDrivers;
 	}
 	public final static int getNumTimeoutSec() {
 		return numTimeoutSec;
@@ -469,7 +476,7 @@ public class LinkValidator {
 					else if (cmdline.hasOption("url")) {
 						// root url was given
 						
-						//DFS
+						//BFS
 						boolRunAsBFSSearch = true;
 						strRootURL = cmdline.getOptionValue("url");
 						
@@ -477,6 +484,19 @@ public class LinkValidator {
 						deque.add(strRootURL);
 						new PrintStream(f_out_dequecontents).println("[Root URL] is : " + strRootURL + "\n");
 						
+					}
+					
+					int bdCnd = numThread;
+					while(bdCnd > 0) {
+						System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
+						FirefoxDriver browserDriver_tmp = new FirefoxDriver();
+						browserDriver_tmp.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
+						browserDriver_tmp.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
+						browserDriver_tmp.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
+						
+						dqBrowserDrivers.addLast(browserDriver_tmp);
+						
+						bdCnd--;
 					}
 						
 					
@@ -491,13 +511,18 @@ public class LinkValidator {
 							
 							new PrintStream(f_out_dequecontents).println(url);
 
-							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsBFSSearch);
+							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
+																					, url
+																					, strUid
+																					, strPasswd
+																					, boolRunAsBFSSearch);
 
 							Thread thread_1 = new Thread( runnable, Integer.toString(numBrowsedPages) );
 							thread_1.start();
 							thread_1.join();
 							
 							numBrowsedPages++;
+							
 							
 						}
 						else {
@@ -511,7 +536,12 @@ public class LinkValidator {
 								url = deque.pop();
 								
 								new PrintStream(f_out_dequecontents).println(url);
-								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp, url, strUid, strPasswd, numTimeoutSec, boolRunAsBFSSearch);
+								
+								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
+																						, url
+																						, strUid
+																						, strPasswd
+																						, boolRunAsBFSSearch);
 								//executorService.execute(runnable);
 								todo.add(Executors.callable(runnable));
 								
@@ -596,11 +626,17 @@ public class LinkValidator {
 		}
 		finally {
 			
+			while( !dqBrowserDrivers.isEmpty() ) {
+				FirefoxDriver browserDriver = dqBrowserDrivers.pop();
+				browserDriver.close();
+			}
+			
 			OS = System.getProperty("os.name");
 			// cleanup the geckodriver in case Windows
 			if ( OS.startsWith("Windows") ) {
 				Runtime.getRuntime().exec("taskkill /F /IM geckodriver.exe /T");
 			}
+
 		}
 		   
 	}
