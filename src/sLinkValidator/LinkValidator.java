@@ -45,7 +45,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.09";
+	private static String strVersionNum = "0.10";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 

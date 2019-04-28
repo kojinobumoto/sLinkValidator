@@ -38,15 +38,17 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.xerces.impl.dv.util.Base64;
 import org.openqa.selenium.By;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
+
+import javax.imageio.ImageIO;
+import ru.yandex.qatools.ashot.AShot;
+import ru.yandex.qatools.ashot.Screenshot;
+import ru.yandex.qatools.ashot.shooting.ShootingStrategies;
 
 public class RunnableLinkChecker implements Runnable {
 
@@ -423,11 +425,18 @@ public class RunnableLinkChecker implements Runnable {
 				String url_httpTrimed_01 = this.strURL.replaceFirst("^" + strPtnProtocol + "[^/]+/?", "");  //trim protocol and hostname from URL. (e.g. http(s)://hostname/path -> path)
 				String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|]", "_");
 				
-				File scrFile = ((TakesScreenshot)browserDriver).getScreenshotAs(OutputType.FILE);
+				Screenshot fpScreenshot = new AShot().shootingStrategy(ShootingStrategies.viewportPasting(1000)).takeScreenshot(browserDriver);
 				File f_ScreenShot = new File("results" + File.separator + "screenshot" + File.separator + URLDecoder.decode(url_httpTrimed_02, "UTF-8") + ".png");
-				if (!f_ScreenShot.exists()) {
-					FileUtils.copyFile(scrFile, f_ScreenShot);
+				File parentDir = f_ScreenShot.getParentFile();
+				if (parentDir != null && ! parentDir.exists() ) {
+					if(!parentDir.mkdirs()){
+				        throw new IOException("error creating results/screenshot directory");
+				    }
 				}
+				if (!f_ScreenShot.exists()) {
+					ImageIO.write(fpScreenshot.getImage(),"PNG", f_ScreenShot);
+				}
+				
 			}
 			
 			if (!boolOptSkipElement) {
