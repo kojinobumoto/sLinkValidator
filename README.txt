@@ -87,7 +87,7 @@ o All available options
                                than 16). 'AUTO' for available processor
                                num.
  -url <URL>                    Base URL to be checked.
- -v,--verbose                  verbose output mode.
+ -v,--verbose                  verbose output mode (outputs all result on colsole).
  -s,--sitemap                  sitemap mode (follows only <a> tag）
  -V,--version                  print version number. 
 
@@ -116,7 +116,6 @@ o Output
       (the meaning of the filename is  __tmp_[thread ID]_[browsed page num]_[timestamp]_xxx.txt)
 
 o Others
-  - Browsing timeout is 2 miniutes in case of download pop-up (zip download etc.).
   - This program neither follow links that created dynamically by JavaScript nor submit the form automatically.
     (follows only links in the page source.)
   - As mentioned in above “Feature” section, this program does not support Chrome and InternetExplorer

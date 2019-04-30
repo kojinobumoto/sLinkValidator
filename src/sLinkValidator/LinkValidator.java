@@ -45,7 +45,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.10";
+	private static String strVersionNum = "0.11";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -70,6 +70,11 @@ public class LinkValidator {
 	private static FileOutputStream f_out_error;
 	private static FileOutputStream f_out_externalLinks;
 	private static FileOutputStream f_out_exceptions;
+	
+	private static String strFnameOk = "";
+	private static String strFnameError = "";
+	private static String sttFNnameExternalLink = "";
+	private static String strFnameExceptions = "";
 
 	private final static ConcurrentHashMap<String, Integer> visitedLinkMap = new ConcurrentHashMap<String, Integer>();
 	
@@ -109,6 +114,18 @@ public class LinkValidator {
 		return strPathToGeckoDriver;
 	}
 	*/
+	public final static String getFnameOK() {
+		return strFnameOk;
+	}
+	public final static String getFnameError() {
+		return strFnameError;
+	}
+	public final static String getFnameExternalLink() {
+		return sttFNnameExternalLink;
+	}
+	public final static String getFnameExceptions() {
+		return strFnameExceptions;
+	}
 	public final static String getRootURL() {
 		return strRootURL;
 	}
@@ -251,7 +268,7 @@ public class LinkValidator {
 				.build();
 		Option optVerbose	= Option.builder("v")
 				.longOpt("verbose")
-				.desc("verbose output mode.")
+				.desc("verbose output mode. (outputs all result on colsole)")
 				.required(false)
 				.build();
 		Option optVersionNum	= Option.builder("V")
@@ -436,11 +453,15 @@ public class LinkValidator {
 					f_ResultDir.mkdir();
 				}
 
+				strFnameOk            = "healthy_links-" + timeStamp + ".txt";
+				strFnameError         = "broken_links-" + timeStamp + ".txt";
+				sttFNnameExternalLink = "external_links-" + timeStamp + ".txt";
+				strFnameExceptions    = "exceptions-" + timeStamp + ".txt";
 				
-				f_out_ok	= new FileOutputStream ("results" + File.separator + "healthy_links-" + timeStamp + ".txt", true);
-			    f_out_error	= new FileOutputStream ("results" + File.separator + "broken_links-" + timeStamp + ".txt", true);
-			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + "exceptions-" + timeStamp + ".txt", true);
-			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + "external_links-" + timeStamp + ".txt", true);
+				f_out_ok	= new FileOutputStream ("results" + File.separator + strFnameOk, true);
+			    f_out_error	= new FileOutputStream ("results" + File.separator + strFnameError, true);
+			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + sttFNnameExternalLink, true);
+			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + strFnameExceptions, true);
 
 			    FileOutputStream f_out_dequecontents = null;
 				ExecutorService executorService = Executors.newFixedThreadPool(numThread);
@@ -557,12 +578,10 @@ public class LinkValidator {
 										new PrintStream(f_out_exceptions).println("future.get() is null. The futre object is " + future.toString() + " .");
 									}
 									else {
-										//System.out.println("future.get = " + future.get().toString()); //too verbose
 										new PrintStream(f_out_ok).println("future.get = " + future.get().toString());
 									}
 								}
 							}
-							
 							numThreadCnt = numThread;
 	
 						}
