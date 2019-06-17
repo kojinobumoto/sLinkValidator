@@ -366,6 +366,32 @@ public class RunnableLinkChecker implements Runnable {
 		}
 	 
 	}
+	/******************************
+	 * handleDoubleQuoteForCSV(String str_in)
+	 * 				take a file lock of "f_to" and append all contents in "strFname_from" to "f_to".
+	 ******************************
+	 * @param str_in
+	 * @return String
+	 */
+	private String handleDoubleQuoteForCSV(String str_in) {
+		
+		String str_out = "";
+		
+		try {
+			str_out = str_in.replaceAll("\"", "\"\"");
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			String exp_msg = "Exception in handleDoubleQuoteForCSV() : " + e.getMessage() + " in thread " + Thread.currentThread().getId() + ", for a string " + str_in;
+	    	System.out.println(exp_msg);
+	    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
+	    	Integer prevCount = (Integer) numExceptions.get();
+	    	numExceptions.set( new Integer(prevCount.intValue() + 1) );	
+		}
+		
+		return str_out;
+	}
+			
 	
 	public void run()
 	{
@@ -374,9 +400,9 @@ public class RunnableLinkChecker implements Runnable {
 		String exp_msg = null;
 		String strPtnProtocol = "https{0,1}://";
 		
-		strFname_ok.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__healthy_links.txt");
-		strFname_error.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__broken_links.txt");
-		strFname_externalLinks.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_"  + strThreadID + "__external_links.txt");
+		strFname_ok.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__healthy_links.csv");
+		strFname_error.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__broken_links.csv");
+		strFname_externalLinks.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_"  + strThreadID + "__external_links.csv");
 		strFname_exceptions.set("results" + File.separator + "__tmp_" + Long.toString(numThreadId) + "_" + strThreadID + "__exceptions.txt");
 
 		// shared variables from BrokenLinkChecker class.
@@ -427,7 +453,7 @@ public class RunnableLinkChecker implements Runnable {
 				//
 				//String url_httpTrimed_01 = this.strURL.replaceFirst("^https{0,1}://[^/]+/", "");
 				String url_httpTrimed_01 = this.strURL.replaceFirst("^" + strPtnProtocol + "[^/]+/?", "");  //trim protocol and hostname from URL. (e.g. http(s)://hostname/path -> path)
-				String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|]", "_");
+				String url_httpTrimed_02 = url_httpTrimed_01.replaceAll("[/?\"<>|:*]", "_");
 				
 				Screenshot fpScreenshot = new AShot().shootingStrategy(ShootingStrategies.viewportPasting(1000)).takeScreenshot(browserDriver);
 				File f_ScreenShot = new File("results" + File.separator + "screenshot" + File.separator + URLDecoder.decode(url_httpTrimed_02, "UTF-8") + ".png");
@@ -460,18 +486,23 @@ public class RunnableLinkChecker implements Runnable {
 				    	String strTagName =  element.getTagName();
 				    	String strTgtURL = null;
 				    	String linkType = "";
+				    	String linkText = "";
+				    	String altText = "";
 				    	
 				    	if (strTagName.equalsIgnoreCase("a")) {
 				    		strTgtURL = element.getAttribute("href");
 				    		linkType = "<a>";
+				    		linkText = element.getText();
 				    	}
 				    	else if (!boolOptSitemapMode && strTagName.equalsIgnoreCase("img")) {
 				    		strTgtURL  = element.getAttribute("src");
 				    		linkType = "<img>";
+				    		altText = element.getAttribute("alt");
 				    	}
 				    	else if (!boolOptSitemapMode && strTagName.equalsIgnoreCase("link")) {
 				    		strTgtURL  = element.getAttribute("href");
 				    		linkType = "<link>";
+				    		linkText = element.getText();
 				    	}
 				    	
 				    	ResponseDataObj respData;
@@ -486,14 +517,28 @@ public class RunnableLinkChecker implements Runnable {
 				    		if(visitedLinkMap.containsKey(noUidPwdURL_decoded))
 				    		{
 
-				    			msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(visited)"; 
+				    			//msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(visited)";
+				    			msg = "\"" + handleDoubleQuoteForCSV(this.strURL) + "\""
+				    					+ "," + linkType 
+				    					+ "," + handleDoubleQuoteForCSV(noUidPwdURL_decoded) 
+				    					+ "," + "(visited)"
+				    					+ ","
+				    					+ ","
+				    					+ ",";
 				    			new PrintStream(f_out_ok.get()).println( msg );
 				    			
 				    		}
 				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL_decoded)) {
 				    			// external link
 	
-				    			msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(external link)";
+				    			// msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(external link)";
+				    			msg = "\"" + this.strURL + "\""
+				    					+ "," + linkType
+				    					+ "," + "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\""
+				    					+ "," + "(external link)"
+				    					+ ","
+				    					+ ","
+				    					+ ",";
 				    			new PrintStream(f_out_externalLinks.get()).println( msg );
 				    			Integer prevCount = (Integer) numExternalLinks.get();
 				    			numExternalLinks.set( new Integer(prevCount.intValue() + 1) );
@@ -526,11 +571,22 @@ public class RunnableLinkChecker implements Runnable {
 				    				deque.addLast(noUidPwdURL_decoded);  // queue
 				    			}
 					    		
+				    			/*
 					    		msg = this.strURL 
-					    				+ "\t" + linkType 
+					    				+ "\t" + linkType
 					    				+ "\t" + noUidPwdURL_decoded
 					    				+ "\t" + respData.getRespMsg() 
-					    				+ "\t" + respData.getRespCode();
+					    				+ "\t" + respData.getRespCode()
+					    				+ "\t" + altText.replaceAll("\r", "").replaceAll("\n", "")
+					    				+ "\t" + linkText.replaceAll("\r", "").replaceAll("\n", "");
+					    		*/
+					    		msg = "\"" + handleDoubleQuoteForCSV(this.strURL) + "\"" 
+					    				+ "," + linkType
+					    				+ "," + "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\""
+					    				+ "," + respData.getRespMsg()
+					    				+ "," + respData.getRespCode()
+					    				+ "," + "\"" + altText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\""
+					    				+ "," + "\"" + linkText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\"";
 					    		 
 				    			if ( respData.getRespCode() >= 400 )
 				    			{

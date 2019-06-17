@@ -33,6 +33,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import java.net.URL;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -45,7 +47,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.11";
+	private static String strVersionNum = "0.12";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -453,9 +455,9 @@ public class LinkValidator {
 					f_ResultDir.mkdir();
 				}
 
-				strFnameOk            = "healthy_links-" + timeStamp + ".txt";
-				strFnameError         = "broken_links-" + timeStamp + ".txt";
-				sttFNnameExternalLink = "external_links-" + timeStamp + ".txt";
+				strFnameOk            = "healthy_links-" + timeStamp + ".csv";
+				strFnameError         = "broken_links-" + timeStamp + ".csv";
+				sttFNnameExternalLink = "external_links-" + timeStamp + ".csv";
 				strFnameExceptions    = "exceptions-" + timeStamp + ".txt";
 				
 				f_out_ok	= new FileOutputStream ("results" + File.separator + strFnameOk, true);
@@ -463,6 +465,18 @@ public class LinkValidator {
 			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + sttFNnameExternalLink, true);
 			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + strFnameExceptions, true);
 
+			    String strCsvHeaders = "Source"
+			    					+ "," + "Type"
+			    					+ "," + "Destination"
+			    					+ "," + "Status"
+			    					+ "," + "\"Status Code\""
+			    					+ "," + "\"Alt text\""
+			    					+ "," + "Anchor";
+			    
+			    new PrintStream(f_out_ok).println(strCsvHeaders);
+			    new PrintStream(f_out_error).println(strCsvHeaders);
+			    new PrintStream(f_out_externalLinks).println(strCsvHeaders);
+			    
 			    FileOutputStream f_out_dequecontents = null;
 				ExecutorService executorService = Executors.newFixedThreadPool(numThread);
 				
@@ -470,7 +484,8 @@ public class LinkValidator {
 				
 				try {
 					
-					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".txt", true);
+					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".csv", true);
+					new PrintStream(f_out_dequecontents).println("URL,\"Response Code\", \"Response Message\"");
 					
 					if (cmdline.hasOption("f")) {
 						// given file of url lists
@@ -530,14 +545,21 @@ public class LinkValidator {
 							
 							url = deque.pop();
 							
-							new PrintStream(f_out_dequecontents).println(url);
+							//new PrintStream(f_out_dequecontents).println(url);
 
+							// obtain http response code
+							ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd);
+							new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
+																		+ "," + respData.getRespCode()
+																		+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\"");
+							
 							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
 																					, url
 																					, strUid
 																					, strPasswd
 																					, boolRunAsBFSSearch);
-
+							
+							
 							Thread thread_1 = new Thread( runnable, Integer.toString(numBrowsedPages) );
 							thread_1.start();
 							thread_1.join();
@@ -556,7 +578,14 @@ public class LinkValidator {
 								
 								url = deque.pop();
 								
-								new PrintStream(f_out_dequecontents).println(url);
+								// new PrintStream(f_out_dequecontents).println(url);
+								
+								// obtain http response code
+								ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd);
+								new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
+																				+ "," + respData.getRespCode()
+																				+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\"");
+
 								
 								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
 																						, url
