@@ -81,8 +81,11 @@ o All available options
  -id,--user <USERNAME>         user id for the BASIC authentication.
  -p,--password <PASSWORD>      password for the BASIC authentication.
  -o, --timeout <Timeout Sec>   second for timeout.
+ --implicitlywait <ImplicitlyWait sec>
+                               second for implicitly wait.
  -skipelement, --no-element-check
                                checks given url only, no element in the page is checked.
+ -instancefollowredirects      if set, HttpURLConnection follows redirects.
  -T,--thread <NUM of Thread>   number of thread (must be an integer, less
                                than 16). 'AUTO' for available processor
                                num.

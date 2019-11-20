@@ -17,10 +17,12 @@ package sLinkValidator;
 public class ResponseDataObj {
 	private final String respMsg;
 	private final int respCode;
+	private final String redirectUrl;
 	
-	public ResponseDataObj(String responseMessage, int responseCode) {
+	public ResponseDataObj(String responseMessage, int responseCode, String redirectTo) {
 		this.respMsg = responseMessage;
 		this.respCode = responseCode;
+		this.redirectUrl = redirectTo;
 	}
 	
 	public String getRespMsg() {
@@ -28,5 +30,8 @@ public class ResponseDataObj {
 	}
 	public int getRespCode() {
 		return respCode;
+	}
+	public String getRedirectUrl() {
+		return redirectUrl;
 	}
 }

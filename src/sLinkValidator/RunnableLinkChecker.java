@@ -189,6 +189,23 @@ public class RunnableLinkChecker implements Runnable {
 
 	}
 	
+	/******************************
+	 * isRedirect(int statusCode)
+	 * 				: Check status code for redirects.	
+	 ******************************
+	 * @param statusCode
+	 * @return boolean (true => redirect, false => not redirect)
+	 *****/
+	protected static boolean isRedirect(int statusCode) {
+	    if (statusCode != HttpURLConnection.HTTP_OK) {
+	        if (statusCode == HttpURLConnection.HTTP_MOVED_TEMP
+	            || statusCode == HttpURLConnection.HTTP_MOVED_PERM
+	                || statusCode == HttpURLConnection.HTTP_SEE_OTHER) {
+	            return true;
+	        }
+	    }
+	    return false;
+	}
 	
 	/******************************
 	 * findAllLinks(WebDriver driver, boolean boolOptAny)
@@ -233,20 +250,26 @@ public class RunnableLinkChecker implements Runnable {
 	 * @param url  : URL to be checked 
 	 * @param uid  : User ID for the Basic authentication.
 	 * @param password : password for the Basic authentication.
+	 * @param boolOptInstanceFollowRedirects : boolean (true => follow redirect, false => not follow redirect (default))
 	 * @return ResponseDataObj(response, statusCode)
 	 * @throws Exception
 	 */
-	public static ResponseDataObj isLinkBroken(URL url, String uid, String password) 
+	public static ResponseDataObj isLinkBroken(URL url, String uid, String password, boolean boolOptInstanceFollowRedirects) 
 	{
 		
-		String response = "";
-		int statusCode = 0;
+		String strResponse = "";
+		String strRedirectUrl = "";
+		int intStatusCode = 0;
 		HttpURLConnection connection;
 	 
 		try
 		{
 			
 			connection = (HttpURLConnection) url.openConnection();
+			if (!boolOptInstanceFollowRedirects) {
+				//do not follow redirects to fetch http status code 30x with basic authentication
+				connection.setInstanceFollowRedirects(false);
+			}
 			
 			// in case of basic auth.
 			if (uid != "" || password != "") {
@@ -257,16 +280,22 @@ public class RunnableLinkChecker implements Runnable {
 			}
 			
 		    connection.connect();
-		    response	= connection.getResponseMessage();
-		    statusCode	= connection.getResponseCode();	        
+		    strResponse	= connection.getResponseMessage();
+		    intStatusCode	= connection.getResponseCode();	
+		    
+		    if ( isRedirect(intStatusCode) ) {
+		    	strRedirectUrl = connection.getHeaderField("Location");
+		    	
+		    }
+		    
 		    connection.disconnect();
 		 
-		    return new ResponseDataObj(response, statusCode);
+		    return new ResponseDataObj(strResponse, intStatusCode, strRedirectUrl);
 		 
 		}
 		catch(Exception exp)
 		{
-			return new ResponseDataObj(exp.getMessage(), -1);
+			return new ResponseDataObj(exp.getMessage(), -1, "");
 		}  
 	}
 	
@@ -412,6 +441,7 @@ public class RunnableLinkChecker implements Runnable {
 		boolean boolOptCapture = LinkValidator.getOptScreenCaptureFlg();
 		boolean boolOptSkipElement = LinkValidator.getOptSkipElementFlg();
 		boolean boolOptSitemapMode = LinkValidator.getSitemapModeFlg();
+		boolean boolOptInstanceFollowRedirects = LinkValidator.getOptInstanceFollowRedirects();
 
 		ConcurrentHashMap<String, Integer> visitedLinkMap = LinkValidator.getVisitedLinkMap();
 		//ConcurrentLinkedDeque<String> stack = LinkValidator.getStack();
@@ -557,7 +587,7 @@ public class RunnableLinkChecker implements Runnable {
 				    				objTgtURL = new URL(strTgtURL);
 				    			}
 				    			
-					    		respData = isLinkBroken(objTgtURL, uid, password);
+					    		respData = isLinkBroken(objTgtURL, uid, password, boolOptInstanceFollowRedirects);
 					    		visitedLinkMap.put(noUidPwdURL_decoded, 1);
 		    			
 				    			if( (this.boolRunAsBFSSearch == true)

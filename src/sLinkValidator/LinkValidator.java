@@ -47,7 +47,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.12";
+	private static String strVersionNum = "0.13";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -61,7 +61,9 @@ public class LinkValidator {
 	private static boolean boolOptScreencapture	= false;
 	private static boolean boolOptSkipElement	= false;
 	private static boolean boolOptSitemapMode	= false;
+	private static boolean boolOptInstanceFollowRedirects	= false;
 	private static int numTimeoutSec = 60; // actually it will be *2 (e.g. if you set 60, the timeout will be 120 sec).
+	private static int numImplicitlyWait = 30;
 	private static int numThread	= 1;
 	// (a note about numMaxThread)
 	// Since the default initial capacity of ConcurrentHashMap() ("concurrencyLevel") 
@@ -146,6 +148,9 @@ public class LinkValidator {
 	public final static boolean getSitemapModeFlg() {
 		return boolOptSitemapMode;
 	}
+	public final static boolean getOptInstanceFollowRedirects() {
+		return boolOptInstanceFollowRedirects;
+	}
 	/*
 	public final static ConcurrentLinkedDeque<String> getStack() {
 		return stack;
@@ -159,6 +164,9 @@ public class LinkValidator {
 	}
 	public final static int getNumTimeoutSec() {
 		return numTimeoutSec;
+	}
+	public final static int getnumImplicitlyWaitSec() {
+		return numImplicitlyWait;
 	}
 	//
 	// End of getter definitions
@@ -242,6 +250,13 @@ public class LinkValidator {
 				.hasArg()
 				.argName("TIMEOUT")
 				.build();
+		Option optImplicitlyWait	= Option.builder("implicitlywait")
+				.longOpt("implicitlywait")
+				.desc("implicitlywait second.")
+				.required(false)
+				.hasArg()
+				.argName("IMPLICITLYWAIT")
+				.build();
 		Option optPasswd	= Option.builder("p")
 				.longOpt("password")
 				.desc("password for the BASIC authentication.")
@@ -268,6 +283,12 @@ public class LinkValidator {
 				.required(false)
 				.argName("SITEMAP")
 				.build();
+		Option optInstanceFollowRedirects	= Option.builder("instancefollowredirects")
+				.longOpt("instancefollowredirects")
+				.desc("if set, HttpURLConnection follows redirects.")
+				.required(false)
+				.argName("INSTANCEFOLLOWREDIRECTS")
+				.build();
 		Option optVerbose	= Option.builder("v")
 				.longOpt("verbose")
 				.desc("verbose output mode. (outputs all result on colsole)")
@@ -290,8 +311,10 @@ public class LinkValidator {
 		options.addOption(optPasswd);				// -p, -password
 		options.addOption(optNumThread);			// -T, -thread
 		options.addOption(optTimeOut);				// -o, -timeout
+		options.addOption(optImplicitlyWait);		// -implicitlywait
 		options.addOption(optUrl);					// -url
 		options.addOption(optSitemapMode);			// -s, -sitemap
+		options.addOption(optInstanceFollowRedirects);			// -instancefollowredirects
 		options.addOption(optVerbose);				// -v, -verbose
 		options.addOption(optVersionNum);			// -V, -version
 		
@@ -352,9 +375,17 @@ public class LinkValidator {
 			if (cmdline.hasOption("o")) {
 				numTimeoutSec = Integer.parseInt(cmdline.getOptionValue("o"))/2;
 			}
+			// -implicitlywait : implicitlywait second.
+			if (cmdline.hasOption("implicitlywait")) {
+				numImplicitlyWait = Integer.parseInt(cmdline.getOptionValue("implicitlywait"))/2;
+			}
 			// -s : sitemap Mode (follows only <a> tag).
 			if (cmdline.hasOption("s")) {
 				boolOptSitemapMode = true;
+			}
+			// -instancefollowredirects (if set HttpURLConnection follows redirects.).
+			if (cmdline.hasOption("instancefollowredirects")) {
+				boolOptInstanceFollowRedirects = true;
 			}
 			// -T : num of thread.
 			if (cmdline.hasOption("T")) {
@@ -485,7 +516,7 @@ public class LinkValidator {
 				try {
 					
 					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".csv", true);
-					new PrintStream(f_out_dequecontents).println("URL,\"Response Code\", \"Response Message\"");
+					new PrintStream(f_out_dequecontents).println("URL,\"Response Code\",\"Response Message\",\"Redirect To\"");
 					
 					if (cmdline.hasOption("f")) {
 						// given file of url lists
@@ -527,7 +558,8 @@ public class LinkValidator {
 						System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
 						FirefoxDriver browserDriver_tmp = new FirefoxDriver();
 						browserDriver_tmp.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
-						browserDriver_tmp.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
+						//browserDriver_tmp.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
+						browserDriver_tmp.manage().timeouts().implicitlyWait(numImplicitlyWait, TimeUnit.SECONDS);
 						browserDriver_tmp.manage().timeouts().setScriptTimeout(numTimeoutSec, TimeUnit.SECONDS);
 						
 						dqBrowserDrivers.addLast(browserDriver_tmp);
@@ -548,10 +580,11 @@ public class LinkValidator {
 							//new PrintStream(f_out_dequecontents).println(url);
 
 							// obtain http response code
-							ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd);
+							ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd, boolOptInstanceFollowRedirects);
 							new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
 																		+ "," + respData.getRespCode()
-																		+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\"");
+																		+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
+																		+ "," + "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\"");
 							
 							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
 																					, url
@@ -581,10 +614,11 @@ public class LinkValidator {
 								// new PrintStream(f_out_dequecontents).println(url);
 								
 								// obtain http response code
-								ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd);
+								ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd, boolOptInstanceFollowRedirects);
 								new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
 																				+ "," + respData.getRespCode()
-																				+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\"");
+																				+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
+																				+ "," + "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\"");
 
 								
 								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
