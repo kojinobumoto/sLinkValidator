@@ -284,8 +284,19 @@ public class RunnableLinkChecker implements Runnable {
 		    intStatusCode	= connection.getResponseCode();	
 		    
 		    if ( isRedirect(intStatusCode) ) {
+		    	
 		    	strRedirectUrl = connection.getHeaderField("Location");
 		    	
+		    	//
+		    	// put original url's anchor to redirecturl
+		    	// to let output url be the same address as in browser's address bar, since
+		    	// "The URL fragment (everything from # on) not even gets sent to the server."
+		    	// see : <https://stackoverflow.com/questions/15133023/hash-url-rewrite-in-htaccess>
+		    	// 
+		    	if (url.getRef() != null && url.getRef().length() != 0) {
+		    		strRedirectUrl = strRedirectUrl + "#" + url.getRef();
+		    	}
+
 		    }
 		    
 		    connection.disconnect();

@@ -47,7 +47,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.13";
+	private static String strVersionNum = "0.14";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -545,7 +545,13 @@ public class LinkValidator {
 						
 						//BFS
 						boolRunAsBFSSearch = true;
+						
 						strRootURL = cmdline.getOptionValue("url");
+						if (!strRootURL.matches(".*[.](htm(l)?|pdf)$") 
+								&& strRootURL.matches(".*[A-Za-z0-9]$"))
+						{
+							strRootURL = strRootURL + "/";
+						}
 						
 						//stack.push(strRootURL);
 						deque.add(strRootURL);
