@@ -47,7 +47,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.14";
+	private static String strVersionNum = "0.15";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -74,11 +74,13 @@ public class LinkValidator {
 	private static FileOutputStream f_out_error;
 	private static FileOutputStream f_out_externalLinks;
 	private static FileOutputStream f_out_exceptions;
+	private static FileOutputStream f_out_summary;
 	
 	private static String strFnameOk = "";
 	private static String strFnameError = "";
 	private static String sttFNnameExternalLink = "";
 	private static String strFnameExceptions = "";
+	private static String strFnameSummary = "";
 
 	private final static ConcurrentHashMap<String, Integer> visitedLinkMap = new ConcurrentHashMap<String, Integer>();
 	
@@ -490,11 +492,13 @@ public class LinkValidator {
 				strFnameError         = "broken_links-" + timeStamp + ".csv";
 				sttFNnameExternalLink = "external_links-" + timeStamp + ".csv";
 				strFnameExceptions    = "exceptions-" + timeStamp + ".txt";
+				strFnameSummary       = "summary-" + timeStamp + ".txt";
 				
 				f_out_ok	= new FileOutputStream ("results" + File.separator + strFnameOk, true);
 			    f_out_error	= new FileOutputStream ("results" + File.separator + strFnameError, true);
 			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + sttFNnameExternalLink, true);
 			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + strFnameExceptions, true);
+			    f_out_summary	    = new FileOutputStream ("results" + File.separator + strFnameSummary, true);
 
 			    String strCsvHeaders = "Source"
 			    					+ "," + "Type"
@@ -684,6 +688,14 @@ public class LinkValidator {
 			    System.out.println("Total Exceptions = "	+	numExceptions);
 			    System.out.println("Total External Links = "	+	numExternalLinks);
 			    System.out.println("Total Browsed Pages = "	+	numBrowsedPages);
+			    
+			    new PrintStream(f_out_summary).println("It took " + TimeUnit.MILLISECONDS.toSeconds(differenceTime) + " seconds.");
+			    new PrintStream(f_out_summary).println("Total healthy Links = "	+	numHealthyLink);
+			    new PrintStream(f_out_summary).println("Total broken Links = "	+	numInvalidLink);
+			    new PrintStream(f_out_summary).println("Total Exceptions = "	+	numExceptions);
+			    new PrintStream(f_out_summary).println("Total External Links = "	+	numExternalLinks);
+			    new PrintStream(f_out_summary).println("Total Browsed Pages = "	+	numBrowsedPages);
+			    f_out_summary.close();
 			    
 			    new PrintStream(f_out_error).println("Total broken Links = " + numInvalidLink);
 			    new PrintStream(f_out_error).println(" ");
