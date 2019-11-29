@@ -261,6 +261,10 @@ public class RunnableLinkChecker implements Runnable {
 		String strRedirectUrl = "";
 		int intStatusCode = 0;
 		HttpURLConnection connection;
+		
+		String strResponseRedirectTo = "";
+		int intStatusCodeRedirectTo = 0;
+		HttpURLConnection connRedirect;
 	 
 		try
 		{
@@ -296,17 +300,25 @@ public class RunnableLinkChecker implements Runnable {
 		    	if (url.getRef() != null && url.getRef().length() != 0) {
 		    		strRedirectUrl = strRedirectUrl + "#" + url.getRef();
 		    	}
+		    	
+		    	URL objTgtURL = getOjbTgtURL(LinkValidator.getRootURL(), strRedirectUrl);
+		    	
+		    	connRedirect = (HttpURLConnection) objTgtURL.openConnection();
+		    	strResponseRedirectTo	= connRedirect.getResponseMessage();
+			    intStatusCodeRedirectTo	= connRedirect.getResponseCode();
+			    
+			    connRedirect.disconnect();
 
 		    }
 		    
 		    connection.disconnect();
 		 
-		    return new ResponseDataObj(strResponse, intStatusCode, strRedirectUrl);
+		    return new ResponseDataObj(strResponse, intStatusCode, strRedirectUrl, intStatusCodeRedirectTo, strResponseRedirectTo);
 		 
 		}
 		catch(Exception exp)
 		{
-			return new ResponseDataObj(exp.getMessage(), -1, "");
+			return new ResponseDataObj(exp.getMessage(), -1, "", -1, "");
 		}  
 	}
 	
@@ -336,6 +348,43 @@ public class RunnableLinkChecker implements Runnable {
 		
 		return res;
 		
+	}
+	
+	/******************************
+	 * getOjbTgtURL (String rootURL, String tgtURL)
+	 * 				: return java.net.URL object.
+	 ******************************
+	 *
+	 * @param strRootURL :	rootURL
+	 * @param tgtURL  :	target URL to be checked.
+	 * @return objTgtURL : java.net.URL object
+	 */
+	@SuppressWarnings("finally")
+	private static URL getOjbTgtURL(String strRootURL, String strTgtURL) throws Exception
+	{
+		URL objTgtURL = null;
+		
+		Matcher mtch_no_http = ptn_no_http.matcher(strTgtURL);
+		
+		try {
+		
+			if ( mtch_no_http.find() )  // if strTgtURL was relative.
+			{
+				objTgtURL = new URL(new URL(strRootURL), strTgtURL);
+			}
+			else {
+				objTgtURL = new URL(strTgtURL);
+			}
+			
+		}
+		catch(Exception exp)
+		{
+			// do nothing
+			throw exp;
+		}
+		finally {
+			return objTgtURL;
+	    }
 	}
 	
 	/******************************
@@ -558,28 +607,19 @@ public class RunnableLinkChecker implements Runnable {
 				    		if(visitedLinkMap.containsKey(noUidPwdURL_decoded))
 				    		{
 
-				    			//msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(visited)";
-				    			msg = "\"" + handleDoubleQuoteForCSV(this.strURL) + "\""
-				    					+ "," + linkType 
-				    					+ "," + handleDoubleQuoteForCSV(noUidPwdURL_decoded) 
-				    					+ "," + "(visited)"
-				    					+ ","
-				    					+ ","
-				    					+ ",";
+				    			msg = String.format("%s,%s,%s,(visited),,,",
+							    					"\"" + handleDoubleQuoteForCSV(this.strURL) + "\""
+							    					, linkType 
+							    					, "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded)  + "\"");
 				    			new PrintStream(f_out_ok.get()).println( msg );
 				    			
 				    		}
 				    		else if (strTagName.equalsIgnoreCase("a") && isExternalSite(strRootURL, noUidPwdURL_decoded)) {
 				    			// external link
-	
-				    			// msg = this.strURL + "\t" + linkType + "\t" + noUidPwdURL_decoded + "\t" + "(external link)";
-				    			msg = "\"" + this.strURL + "\""
-				    					+ "," + linkType
-				    					+ "," + "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\""
-				    					+ "," + "(external link)"
-				    					+ ","
-				    					+ ","
-				    					+ ",";
+				    			msg = String.format("%s,%s,%s,(external link),,,",
+								    				"\"" + this.strURL + "\""
+								    				, linkType
+								    				, "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\"");
 				    			new PrintStream(f_out_externalLinks.get()).println( msg );
 				    			Integer prevCount = (Integer) numExternalLinks.get();
 				    			numExternalLinks.set( new Integer(prevCount.intValue() + 1) );
@@ -587,15 +627,12 @@ public class RunnableLinkChecker implements Runnable {
 				    		else {
 				    			
 				    			// (Note)
-				    			// at this moment, objTgtURL is always null because of finally() part.
+				    			// at this moment, objTgtURL is always null because of finally() part.			    			
+				    			objTgtURL = getOjbTgtURL(strRootURL, strTgtURL);
 				    			
-				    			Matcher mtch_no_http = ptn_no_http.matcher(strTgtURL);
-				    			if ( mtch_no_http.find() )  // if strTgtURL was relative.
-					    		{
-				    				objTgtURL = new URL(new URL(strRootURL), strTgtURL);
-					    		}
-				    			else {
-				    				objTgtURL = new URL(strTgtURL);
+				    			//assert objTgtURL ;
+				    			if (objTgtURL == null) {
+				    				throw new IllegalArgumentException("getOjbTgtURL(" + strRootURL + "," + strTgtURL + ") returned null!");
 				    			}
 				    			
 					    		respData = isLinkBroken(objTgtURL, uid, password, boolOptInstanceFollowRedirects);
@@ -612,22 +649,15 @@ public class RunnableLinkChecker implements Runnable {
 				    				deque.addLast(noUidPwdURL_decoded);  // queue
 				    			}
 					    		
-				    			/*
-					    		msg = this.strURL 
-					    				+ "\t" + linkType
-					    				+ "\t" + noUidPwdURL_decoded
-					    				+ "\t" + respData.getRespMsg() 
-					    				+ "\t" + respData.getRespCode()
-					    				+ "\t" + altText.replaceAll("\r", "").replaceAll("\n", "")
-					    				+ "\t" + linkText.replaceAll("\r", "").replaceAll("\n", "");
-					    		*/
-					    		msg = "\"" + handleDoubleQuoteForCSV(this.strURL) + "\"" 
-					    				+ "," + linkType
-					    				+ "," + "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\""
-					    				+ "," + respData.getRespMsg()
-					    				+ "," + respData.getRespCode()
-					    				+ "," + "\"" + altText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\""
-					    				+ "," + "\"" + linkText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\"";
+					    		
+					    		msg = String.format("%s,%s,%s,%s,%s,%s,%s",
+								    				"\"" + handleDoubleQuoteForCSV(this.strURL) + "\""
+								    				, linkType
+								    				, "\"" + handleDoubleQuoteForCSV(noUidPwdURL_decoded) + "\""
+								    				, respData.getRespMsg()
+								    				, respData.getRespCode()
+								    				, "\"" + altText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\""
+								    				, "\"" + linkText.replaceAll("\r", "").replaceAll("\n", "").replaceAll("\"", "\"\"") + "\"");
 					    		 
 				    			if ( respData.getRespCode() >= 400 )
 				    			{
@@ -653,7 +683,16 @@ public class RunnableLinkChecker implements Runnable {
 				    catch (UnsupportedEncodingException e) {
 		    		    // not going to happen - value came from JDK's own StandardCharsets
 				    	// just for noUidPwdURL_decoded in case something wrong happens
-				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "[UnsupportedEncodingException] Message  :  " + e.getMessage();
+				    	exp_msg = String.format("%s,"
+						    					+ "Tag : \"%s\","
+								    			+ "At attribute : \"%s\","
+								    			+ "[UnsupportedEncodingException] @class : %s,@method : %s,Message : %s",
+							    			this.strURL
+							    			, element.getTagName()
+							    			, element.getAttribute("innerHTML")
+							    			, e.getStackTrace()[0].getClassName()
+							    			, e.getStackTrace()[0].getMethodName()
+							    			, e.getMessage());
 				    	System.out.println(exp_msg);
 				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
 				    	Integer prevCount = (Integer) numExceptions.get();
@@ -662,7 +701,16 @@ public class RunnableLinkChecker implements Runnable {
 		    		}
 				    catch(Exception exp)
 				    {
-				    	exp_msg = this.strURL + "\t" + "At attribute : \"" + element.getAttribute("innerHTML") + "\".\t" + "Message  :  " + exp.getMessage();
+				    	exp_msg = String.format("%s,"
+					    						+ "Tag:\"%s\","
+								    			+ "At attribute : \"%s\","
+								    			+ "[Exception] @class : %s, @method : %s, Message : %s",
+							    			this.strURL
+							    			, element.getTagName()
+							    			, element.getAttribute("innerHTML")
+							    			, exp.getStackTrace()[0].getClassName()
+							    			, exp.getStackTrace()[0].getMethodName()
+							    			, exp.getMessage());
 				    	System.out.println(exp_msg);
 				    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
 				    	Integer prevCount = (Integer) numExceptions.get();
@@ -678,7 +726,7 @@ public class RunnableLinkChecker implements Runnable {
 		}
 		catch(Exception exp)
 		{
-	    	exp_msg = "[In Main Loop] An Exception occured at page " + this.strURL + " .\tMessage  :  " + exp.getMessage();
+	    	exp_msg = String.format("[In Main Loop] An Exception occured at page %s. Message : %s", this.strURL, exp.getMessage());
 	    	System.out.println(exp_msg);
 	    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
 	    	Integer prevCount = (Integer) numExceptions.get();
@@ -702,7 +750,7 @@ public class RunnableLinkChecker implements Runnable {
 			    f_out_exceptions.get().close();
 			} catch (IOException exp) {
 				exp.printStackTrace();
-				exp_msg = "[finally part in Main run()] An Exception occured at page " + this.strURL + " .\tMessage  :  " + exp.getMessage();
+				exp_msg = String.format("[finally part in Main run()] An Exception occured at page %s. Message : %s", this.strURL, exp.getMessage());
 		    	System.out.println(exp_msg);
 		    	new PrintStream(f_out_exceptions.get()).println(exp_msg);
 		    	Integer prevCount = (Integer) numExceptions.get();

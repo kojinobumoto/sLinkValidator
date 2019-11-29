@@ -47,7 +47,7 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.15";
+	private static String strVersionNum = "0.16";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
@@ -500,13 +500,14 @@ public class LinkValidator {
 			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + strFnameExceptions, true);
 			    f_out_summary	    = new FileOutputStream ("results" + File.separator + strFnameSummary, true);
 
-			    String strCsvHeaders = "Source"
-			    					+ "," + "Type"
-			    					+ "," + "Destination"
-			    					+ "," + "Status"
-			    					+ "," + "\"Status Code\""
-			    					+ "," + "\"Alt text\""
-			    					+ "," + "Anchor";
+			    String strCsvHeaders = String.format("%s,%s,%s,%s,%s,%s,%s",
+										    		"Source"
+							    					, "Type"
+							    					, "Destination"
+							    					, "Status"
+							    					, "\"Status Code\""
+							    					, "\"Alt text\""
+							    					, "Anchor");
 			    
 			    new PrintStream(f_out_ok).println(strCsvHeaders);
 			    new PrintStream(f_out_error).println(strCsvHeaders);
@@ -516,11 +517,19 @@ public class LinkValidator {
 				ExecutorService executorService = Executors.newFixedThreadPool(numThread);
 				
 				String url = "";
+				String strRespCodeRedirectTo = "";
 				
 				try {
 					
 					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".csv", true);
-					new PrintStream(f_out_dequecontents).println("URL,\"Response Code\",\"Response Message\",\"Redirect To\"");
+					new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+																				"URL"
+																				, "\"Response Code\""
+																				,"\"Response Message\""
+																				,"\"Redirect To\""
+																				,"\"Response Code(RedirectTo)\""
+																				,"\"Response Message(RedirectTo)\"")
+																);
 					
 					if (cmdline.hasOption("f")) {
 						// given file of url lists
@@ -586,15 +595,21 @@ public class LinkValidator {
 							// In case numThread is 1, perform the check by the safest way.
 							
 							url = deque.pop();
-							
-							//new PrintStream(f_out_dequecontents).println(url);
 
 							// obtain http response code
 							ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd, boolOptInstanceFollowRedirects);
-							new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
-																		+ "," + respData.getRespCode()
-																		+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
-																		+ "," + "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\"");
+							strRespCodeRedirectTo = "";
+							if (respData.getRespCodeRedirectTo() != 0) {
+								strRespCodeRedirectTo = String.valueOf(respData.getRespCodeRedirectTo());
+							}
+							new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+																						"\"" + url.replaceAll("\"", "\"\"") + "\""
+																						, respData.getRespCode()
+																						, "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
+																						, "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\""
+																						, strRespCodeRedirectTo
+																						, "\"" + respData.getRespMsgRedirectTo().replaceAll("\"", "\"\"") + "\"")
+																		);
 							
 							RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp
 																					, url
@@ -620,15 +635,21 @@ public class LinkValidator {
 							while(!deque.isEmpty() || (numThreadCnt > 0 && deque.size() >= numThreadCnt ) ) {
 								
 								url = deque.pop();
-								
-								// new PrintStream(f_out_dequecontents).println(url);
-								
+
 								// obtain http response code
 								ResponseDataObj respData = RunnableLinkChecker.isLinkBroken(new URL(url), strUid, strPasswd, boolOptInstanceFollowRedirects);
-								new PrintStream(f_out_dequecontents).println("\"" + url.replaceAll("\"", "\"\"") + "\""
-																				+ "," + respData.getRespCode()
-																				+ "," + "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
-																				+ "," + "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\"");
+								strRespCodeRedirectTo = "";
+								if (respData.getRespCodeRedirectTo() != 0) {
+									strRespCodeRedirectTo = String.valueOf(respData.getRespCodeRedirectTo());
+								}
+								new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+																							"\"" + url.replaceAll("\"", "\"\"") + "\""
+																							, respData.getRespCode()
+																							, "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
+																							, "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\""
+																							, strRespCodeRedirectTo
+																							, "\"" + respData.getRespMsgRedirectTo().replaceAll("\"", "\"\"") + "\"")
+																			);;
 
 								
 								RunnableLinkChecker runnable = new RunnableLinkChecker(Integer.toString(numBrowsedPages) + "_" + timeStamp

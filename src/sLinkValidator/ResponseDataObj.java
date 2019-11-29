@@ -18,11 +18,15 @@ public class ResponseDataObj {
 	private final String respMsg;
 	private final int respCode;
 	private final String redirectUrl;
+	private final int respCodeRedirectTo;
+	private final String respMsgRedirectTo;
 	
-	public ResponseDataObj(String responseMessage, int responseCode, String redirectTo) {
+	public ResponseDataObj(String responseMessage, int responseCode, String redirectTo, int responseCodeRedirectTo, String responseMessageRedirectTo) {
 		this.respMsg = responseMessage;
 		this.respCode = responseCode;
 		this.redirectUrl = redirectTo;
+		this.respCodeRedirectTo = responseCodeRedirectTo;
+		this.respMsgRedirectTo = responseMessageRedirectTo;
 	}
 	
 	public String getRespMsg() {
@@ -33,5 +37,11 @@ public class ResponseDataObj {
 	}
 	public String getRedirectUrl() {
 		return redirectUrl;
+	}
+	public int getRespCodeRedirectTo() {
+		return respCodeRedirectTo;
+	}
+	public String getRespMsgRedirectTo() {
+		return respMsgRedirectTo;
 	}
 }
