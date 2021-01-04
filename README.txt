@@ -1,5 +1,5 @@
 o Program Name
-  SLinkValidator
+  SLinkValidator (Simple Link Validator)
 
 o Basic behavior
   * This program,
