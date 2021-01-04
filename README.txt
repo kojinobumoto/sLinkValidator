@@ -1,4 +1,4 @@
-﻿o Program Name
+o Program Name
   SLinkValidator
 
 o Basic behavior
@@ -13,20 +13,12 @@ o Basic behavior
     - continue browsing/checking if the found link path was included in the given URL.
 
 o Verified Platform
-  * Windows 7
-  * (ver 0.0.4 or older) Mac OS X 10.10 (Yosemite) (JRE 1.8 or higher)
+  * Windows 10
 
 o Required software/component
   * Java 8 (JRE 1.8 or higher)
   * Selenium Client WebDriver
-  * Firefox
-      until ver 0.0.4 => FF 48.0 or older, and selenium 2.45
-      0.0.5 => for Selenium 3 and FF 50+ with geckodriver
-              (you need to place geckodriver into C:\\Program Files (x86)\\geckodriver\\geckodriver.exe
-              see https://github.com/seleniumhq/selenium/issues/2320 in detail.)
-      0.0.6 => Now you must specify the path to the geckodriver binary.
-               e.g. [win] -gecko "C:\Program Files (x86)\geckodriver\geckodriver.exe"
-                    [mac]-gecko /path/to/geckodriver
+  * ChromeDriver
   * Apache Commons CLI (I have created this software as the CLI application)
 
 o Feature
@@ -34,6 +26,11 @@ o Feature
     - This program automatically browses links found in the given URL page if the link path contains the first URL.
       -- "-skipelement" option skips all above link check and just browse given url(s)
     - You can specify urls by making a url list (a file contains one url per line).
+  * Multi threading. 
+    The thread number, which is equal the number of simultaneously opening browser, can be specified by “-T” option.
+    If you give ‘-T auto’ as the option, this program automatically detect the number of available processor and use 
+  * BASIC authentication handling.
+  * saves chrome browser's console.log.
   * takes page capture ("-capture" option)
     - with the "-capture" option, this program takes a screen capture of the browsed page.
       --  "/" character in the URL path is replaced to "_" (underscore).
@@ -41,20 +38,13 @@ o Feature
          also replaced to "_".
       -- This software does not support Chrome and InternetExplorer since the driver of those two browser
           cannot take full page screenshot.
-  * Multi threading. 
-    The thread number, which is equal the number of simultaneously opening browser, can be specified by “-T” option.
-    If you give ‘-T auto’ as the option, this program automatically detect the number of available processor and use 
-  * BASIC authentication handling.
 
 o How to use.
   Build runnable jars with necessary jar(s) and run it as the command line application
   with specifying necessary options.
 
   (example)
-  $> java -jar SLinkValidator.jar -url http://a.b.com/
-  
-  (ver 0.0.6)
-  $> java -jar SLinkValidator.jar -gecko "C:\Program Files (x86)\geckodriver\geckodriver.exe" -url http://a.b.com/
+  $> java -jar SLinkValidator.jar -webdriver "C:\Program Files (x86)\chromedriver\chromedriver.exe" -url http://a.b.com/
 
 
 o How to specify URL to browse.
@@ -70,8 +60,8 @@ o How to specify URL to browse.
 
 o All available options
 
- -gecko, --path-to-gecko (mandatory)
-                               Specify the full path to the geckodriver binary. 
+ -webdriver, --path-to-webdriver (mandatory)
+                               Specify the full path to the chromedriver binary. 
 
  -a,--all                      Also check "link" tag.
  -capture,--screenshot         takes the page capture.
@@ -102,21 +92,33 @@ o Output
 
   * Following files will be created under "results" directory.
 
-    - healthy_links-[TIMESTAMP].txt
+    - 01.summary-[TIMESTAMP].txt
+      summary of the output
+
+    - 02.browsed_pages-[TIMESTAMP].csv
+      browsed pages and it's status.
+
+    - 03.healthy_links-[TIMESTAMP].csv
       log of links with HTTP status code 2xx, 3xx.
   
-    - broken_links-[TIMESTAMP].txt
+    - 04.broken_links-[TIMESTAMP].csv
       log of links with HTTP status above 400 (4xx, 5xx).
   
-    - exceptions-[TIMESTAMP].txt
-      logs of java exception.
-  
-    - external_links-[TIMESTAMP].txt
+    - 05.external_links-[TIMESTAMP].txt
       logs of links being judged external, which is included in the given URL.
   
-    - __tmp-xxxx.txt
+    - 06.exceptions-[TIMESTAMP].txt
+      logs of java exception.
+  
+    - 07.console_logs-[TIMESTAMP].csv
+      console.logs of browsed pages.
+      
+      - 07-02.formatted_console_logs-[TIMESTAMP].csv
+        TSV formatted file of 07.console_logs-XXXX.csv
+  
+    - __tmp-xxxx.csv
       temp file of each thread, will be deleted after each thread finishes.
-      (the meaning of the filename is  __tmp_[thread ID]_[browsed page num]_[timestamp]_xxx.txt)
+      (the meaning of the filename is  __tmp_[thread ID]_[browsed page num]_[timestamp]_xxx.csv)
 
 o Others
   - This program neither follow links that created dynamically by JavaScript nor submit the form automatically.
