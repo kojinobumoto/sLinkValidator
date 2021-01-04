@@ -42,21 +42,24 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
  
 
 public class LinkValidator {
 	
-	private static String strVersionNum = "0.16";
+	private static String strVersionNum = "0.17";
 	private static String strProgramName = "SLinkValidator";
 	private static String OS = null;
 
 	static Pattern ptn_http		= Pattern.compile("http://");
 	static Pattern ptn_no_http	= Pattern.compile("^((?!http://).)+$");
 	
-	private static String strPathToGeckoDriver		= "";
+	//private static String strPathToGeckoDriver		= "";
+	private static String strPathToWebDriver		= "";
 	private static String strRootURL		= "";
 	private static boolean boolOptAny		= false;
+	private static boolean boolUrlList		= false;
 	private static boolean boolOptVerbose	= false;
 	private static boolean boolOptScreencapture	= false;
 	private static boolean boolOptSkipElement	= false;
@@ -75,12 +78,14 @@ public class LinkValidator {
 	private static FileOutputStream f_out_externalLinks;
 	private static FileOutputStream f_out_exceptions;
 	private static FileOutputStream f_out_summary;
+	private static FileOutputStream f_out_consolelog;
 	
-	private static String strFnameOk = "";
-	private static String strFnameError = "";
-	private static String sttFNnameExternalLink = "";
-	private static String strFnameExceptions = "";
-	private static String strFnameSummary = "";
+	private static String strFnameOk               = "";
+	private static String strFnameError            = "";
+	private static String sttFNnameExternalLink    = "";
+	private static String strFnameExceptions       = "";
+	private static String strFnameSummary          = "";
+	private static String strFnameConsoleLog       = "";
 
 	private final static ConcurrentHashMap<String, Integer> visitedLinkMap = new ConcurrentHashMap<String, Integer>();
 	
@@ -88,13 +93,16 @@ public class LinkValidator {
 	private static AtomicInteger numInvalidLink		= new AtomicInteger(0);
 	private static AtomicInteger numExternalLinks	= new AtomicInteger(0);
 	private static AtomicInteger numExceptions		= new AtomicInteger(0);
+	private static AtomicInteger numConsoleSevere	= new AtomicInteger(0);
+	private static AtomicInteger numConsoleWarn		= new AtomicInteger(0);
 	private static int numBrowsedPages	= 0;
 	
 	// stack for BFS search (ConcurrentLinkedDeque class's deque).
 	private static boolean boolRunAsBFSSearch = false;
 	//private static ConcurrentLinkedDeque<String> stack = new ConcurrentLinkedDeque<String>();
 	private static ConcurrentLinkedDeque<String> deque = new ConcurrentLinkedDeque<String>();
-	private static ConcurrentLinkedDeque<FirefoxDriver> dqBrowserDrivers = new ConcurrentLinkedDeque<FirefoxDriver>();
+	//private static ConcurrentLinkedDeque<FirefoxDriver> dqBrowserDrivers = new ConcurrentLinkedDeque<FirefoxDriver>();
+	private static ConcurrentLinkedDeque<WebDriver> dqBrowserDrivers = new ConcurrentLinkedDeque<WebDriver>();
 	
 	//////////////////////////////
 	//
@@ -111,6 +119,9 @@ public class LinkValidator {
 	}
 	public final static FileOutputStream getFStreamOutExceptions() {
 		return f_out_exceptions;
+	}
+	public final static FileOutputStream getFStreamOutConsoleLog() {
+		return f_out_consolelog;
 	}
 	public final static ConcurrentHashMap<String, Integer> getVisitedLinkMap() {
 		return visitedLinkMap;
@@ -132,11 +143,17 @@ public class LinkValidator {
 	public final static String getFnameExceptions() {
 		return strFnameExceptions;
 	}
+	public final static String getFnameConsoleLog() {
+		return strFnameConsoleLog;
+	}
 	public final static String getRootURL() {
 		return strRootURL;
 	}
 	public final static boolean getOptAny() {
 		return boolOptAny;
+	}
+	public final static boolean getBoolUrlList() {
+		return boolUrlList;
 	}
 	public final static boolean getOptVerboseFlg() {
 		return boolOptVerbose;
@@ -161,7 +178,12 @@ public class LinkValidator {
 	public final static ConcurrentLinkedDeque<String> getDeque() {
 		return deque;
 	}
+	/*
 	public final static ConcurrentLinkedDeque<FirefoxDriver> getDQBrowserDrivers() {
+		return dqBrowserDrivers;
+	}
+	*/
+	public final static ConcurrentLinkedDeque<WebDriver> getDQBrowserDrivers() {
 		return dqBrowserDrivers;
 	}
 	public final static int getNumTimeoutSec() {
@@ -190,7 +212,12 @@ public class LinkValidator {
 	public static void addAndGetNumExceptions(int delta) {
 		numExceptions.addAndGet(delta);
 	}
-
+	public static void addAndGetNumConsoleSevere(int delta) {
+		numConsoleSevere.addAndGet(delta);
+	}
+	public static void addAndGetNumConsoleWarn(int delta) {
+		numConsoleWarn.addAndGet(delta);
+	}
 	// End of Atomic operations
 	
 	
@@ -205,9 +232,17 @@ public class LinkValidator {
 		// create the options object.
 		Options options = new Options();
 
+		/*
 		Option optPathToGeckoDriver = Option.builder("gecko")
 				.longOpt("path-to-gecko")
 				.desc("[Mandatory] full path to geckodriver.exe")
+				.required(true)
+				.hasArg()
+				.build();
+				*/
+		Option optPathToWebDriver = Option.builder("webdriver")
+				.longOpt("path-to-webdriver")
+				.desc("[Mandatory] full path to chromedriver.exe")
 				.required(true)
 				.hasArg()
 				.build();
@@ -303,7 +338,8 @@ public class LinkValidator {
 				.build();
 
 
-		options.addOption(optPathToGeckoDriver);	// -gecko, --path-to-gecko
+		//options.addOption(optPathToGeckoDriver);	// -gecko, --path-to-gecko
+		options.addOption(optPathToWebDriver);	    // -webdriver, --path-to-webdrive
 		options.addOption(optAny);					// -a, -all
 		options.addOption(optListFile);				// -f, -url-list
 		options.addOption(optHelp);					// -h, -help
@@ -325,6 +361,7 @@ public class LinkValidator {
 			
 			String strUid	= "";
 			String strPasswd	= "";
+			String strResultsDir = "";
 			
 			long startTime = System.currentTimeMillis();
 
@@ -334,11 +371,21 @@ public class LinkValidator {
 			CommandLine cmdline = parser.parse(options, args);
 			
 
+			/*
 			// -gecko (mandatory) : full path to the geckodriver binary file (e.g. [win] c:\path\to\geckodriver.exe, [mac] /path/to/geckodriver)
 			if (cmdline.hasOption("gecko")) {
 				strPathToGeckoDriver = cmdline.getOptionValue("gecko");	
 				if (strPathToGeckoDriver == null) {
 					System.out.println("Specified path to geckodriver.exe was null. Please check again.");
+					System.exit(0);
+				}
+			}
+			*/
+			// -webdriver (mandatory) : full path to the geckodriver binary file (e.g. [win] c:\path\to\chromedriver.exe, [mac] /path/to/chromedriver)
+			if (cmdline.hasOption("webdriver")) {
+				strPathToWebDriver = cmdline.getOptionValue("webdriver");	
+				if (strPathToWebDriver == null) {
+					System.out.println("Specified path to webdriver.exe was null. Please check again.");
 					System.exit(0);
 				}
 			}
@@ -350,6 +397,10 @@ public class LinkValidator {
 			// -a : any flag. (checks <link> tag's href)
 			if (cmdline.hasOption("a")) {
 				boolOptAny = true;
+			}
+			// -f, -url-list (read targets from file)
+			if (cmdline.hasOption("f")) {
+				boolUrlList = true;
 			}
 			// -h : show help.  or no option specified
 			if ( cmdline.hasOption("h") || args.length == 0) {
@@ -480,25 +531,29 @@ public class LinkValidator {
 				//WebDriver browserDriver = new InternetExplorerDriver();
 				
 				
+				strResultsDir = "results" + "-" + timeStamp;
+				
 				// (note)
 				// java.io.File doesn't represent an open file, it represents a path in the filesystem. 
 				// Therefore having close method on it doesn't make sense.
-				File f_ResultDir = new File("." + File.separator + "results");
+				File f_ResultDir = new File("." + File.separator + strResultsDir);
 				if (!f_ResultDir.exists()) {
 					f_ResultDir.mkdir();
 				}
 
-				strFnameOk            = "healthy_links-" + timeStamp + ".csv";
-				strFnameError         = "broken_links-" + timeStamp + ".csv";
-				sttFNnameExternalLink = "external_links-" + timeStamp + ".csv";
-				strFnameExceptions    = "exceptions-" + timeStamp + ".txt";
-				strFnameSummary       = "summary-" + timeStamp + ".txt";
+				strFnameOk            = "03.healthy_links-" + timeStamp + ".csv";
+				strFnameError         = "04.broken_links-" + timeStamp + ".csv";
+				sttFNnameExternalLink = "05.external_links-" + timeStamp + ".csv";
+				strFnameExceptions    = "06.exceptions-" + timeStamp + ".txt";
+				strFnameSummary       = "01.summary-" + timeStamp + ".txt";
+				strFnameConsoleLog    = "07.console_logs-" + timeStamp + ".csv";
 				
-				f_out_ok	= new FileOutputStream ("results" + File.separator + strFnameOk, true);
-			    f_out_error	= new FileOutputStream ("results" + File.separator + strFnameError, true);
-			    f_out_externalLinks	= new FileOutputStream ("results" + File.separator + sttFNnameExternalLink, true);
-			    f_out_exceptions	= new FileOutputStream ("results" + File.separator + strFnameExceptions, true);
-			    f_out_summary	    = new FileOutputStream ("results" + File.separator + strFnameSummary, true);
+				f_out_ok	        = new FileOutputStream (strResultsDir + File.separator + strFnameOk, true);
+			    f_out_error	        = new FileOutputStream (strResultsDir + File.separator + strFnameError, true);
+			    f_out_externalLinks	= new FileOutputStream (strResultsDir + File.separator + sttFNnameExternalLink, true);
+			    f_out_exceptions	= new FileOutputStream (strResultsDir + File.separator + strFnameExceptions, true);
+			    f_out_summary	    = new FileOutputStream (strResultsDir + File.separator + strFnameSummary, true);
+			    f_out_consolelog    = new FileOutputStream (strResultsDir + File.separator + strFnameConsoleLog, true);
 
 			    String strCsvHeaders = String.format("%s,%s,%s,%s,%s,%s,%s",
 										    		"Source"
@@ -513,6 +568,12 @@ public class LinkValidator {
 			    new PrintStream(f_out_error).println(strCsvHeaders);
 			    new PrintStream(f_out_externalLinks).println(strCsvHeaders);
 			    
+			    new PrintStream(f_out_consolelog).println( String.format("%s,%s,%s",
+			    		                                   "LogLevel"
+			    		                                   , "Message"
+			    		                                   , "URL")
+			    		                                 );
+			    
 			    FileOutputStream f_out_dequecontents = null;
 				ExecutorService executorService = Executors.newFixedThreadPool(numThread);
 				
@@ -521,9 +582,10 @@ public class LinkValidator {
 				
 				try {
 					
-					f_out_dequecontents = new FileOutputStream ("results" + File.separator + "browsed_pages-" + timeStamp + ".csv", true);
-					new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+					f_out_dequecontents = new FileOutputStream (strResultsDir + File.separator + "02.browsed_pages-" + timeStamp + ".csv", true);
+					new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s,%s",
 																				"URL"
+																				, "Title"
 																				, "\"Response Code\""
 																				,"\"Response Message\""
 																				,"\"Redirect To\""
@@ -574,8 +636,54 @@ public class LinkValidator {
 					
 					int bdCnd = numThread;
 					while(bdCnd > 0) {
+						
+						/*
+						 * giving up to use geckodriver since I want to take JavaScript's console.error.
+						 * changed to chromedriver instead. (2020/12/28)
+						 * 
+						 *  https://github.com/mozilla/geckodriver/issues/330
+						 *  > andreastt commented on 11 Nov 2016
+						 *  > geckodriver is an implementation of W3C WebDriver which doesn’t specify a log interface at the moment, so this is expected behaviour.
+						 *  -----
+						 *  > whimboo commented on 11 Feb 2019
+						 *  > Starting with Firefox 65 you are able to at least route any logging through the Console API to the geckodriver log. 
+						 *  > Here the entry from our geckodriver 0.24.0 release notes:
+						 *  > > When using the preference devtools.console.stdout.content set to
+						 *  > > true logging of console API calls like info(), warn(), and
+						 *  > > error() can be routed to stdout.
+						 */
+						
+						/*
 						System.setProperty("webdriver.gecko.driver", strPathToGeckoDriver); // for Selenium 3 and FF 50+
 						FirefoxDriver browserDriver_tmp = new FirefoxDriver();
+						*/
+						
+						/*//2020/12/27 * /
+						// see https://stackoverflow.com/questions/52464598/how-can-i-set-a-default-profile-for-the-firefox-driver-in-selenium-webdriver-3
+						//FirefoxProfile profile = new FirefoxProfile();
+						//profile.setPreference("devtools.console.stdout.content", true);
+						ProfilesIni profileIni = new ProfilesIni();
+						FirefoxProfile ff_profile = profileIni.getProfile("default");
+						ff_profile.setPreference("devtools.console.stdout.content", true);
+						FirefoxOptions ff_options = new FirefoxOptions();
+						ff_options.setProfile(ff_profile);
+						
+						FirefoxDriver browserDriver_tmp = new FirefoxDriver(ff_options);
+						/ * //end of 2020/12/27 */
+						
+						// 2020/12/28
+						/*
+						ChromeOptions chrome_opt = new ChromeOptions();
+						chrome_opt.setPageLoadStrategy(PageLoadStrategy.NONE);
+						
+						System.setProperty("webdriver.chrome.driver", strPathToWebDriver);
+						WebDriver browserDriver_tmp = new ChromeDriver(chrome_opt);
+						*/
+						/* //end of 2020/12/28 */
+						
+						System.setProperty("webdriver.chrome.driver", strPathToWebDriver);
+						WebDriver browserDriver_tmp = new ChromeDriver();
+						
 						browserDriver_tmp.manage().timeouts().pageLoadTimeout(numTimeoutSec, TimeUnit.SECONDS);
 						//browserDriver_tmp.manage().timeouts().implicitlyWait(numTimeoutSec, TimeUnit.SECONDS);  // (note) want to set to 120 second but somehow, it waits (second * 2) second. Bug?
 						browserDriver_tmp.manage().timeouts().implicitlyWait(numImplicitlyWait, TimeUnit.SECONDS);
@@ -602,8 +710,9 @@ public class LinkValidator {
 							if (respData.getRespCodeRedirectTo() != 0) {
 								strRespCodeRedirectTo = String.valueOf(respData.getRespCodeRedirectTo());
 							}
-							new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+							new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s,%s",
 																						"\"" + url.replaceAll("\"", "\"\"") + "\""
+																						, "\"" + respData.getPageTitle().replaceAll("\"", "\"\"") + "\""
 																						, respData.getRespCode()
 																						, "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
 																						, "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\""
@@ -615,6 +724,7 @@ public class LinkValidator {
 																					, url
 																					, strUid
 																					, strPasswd
+																					, strResultsDir
 																					, boolRunAsBFSSearch);
 							
 							
@@ -642,8 +752,9 @@ public class LinkValidator {
 								if (respData.getRespCodeRedirectTo() != 0) {
 									strRespCodeRedirectTo = String.valueOf(respData.getRespCodeRedirectTo());
 								}
-								new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s",
+								new PrintStream(f_out_dequecontents).println(String.format("%s,%s,%s,%s,%s,%s,%s",
 																							"\"" + url.replaceAll("\"", "\"\"") + "\""
+																							, "\"" + respData.getPageTitle().replaceAll("\"", "\"\"") + "\""
 																							, respData.getRespCode()
 																							, "\"" + respData.getRespMsg().replaceAll("\"", "\"\"") + "\""
 																							, "\"" + respData.getRedirectUrl().replaceAll("\"", "\"\"") + "\""
@@ -656,6 +767,7 @@ public class LinkValidator {
 																						, url
 																						, strUid
 																						, strPasswd
+																						, strResultsDir
 																						, boolRunAsBFSSearch);
 								//executorService.execute(runnable);
 								todo.add(Executors.callable(runnable));
@@ -702,20 +814,30 @@ public class LinkValidator {
 				
 				long endTime = System.currentTimeMillis();
 				long differenceTime = endTime - startTime;
+				String stNoteInCaseSkipelement = "";
+				
+				if ( boolOptSkipElement == true)
+				{
+					stNoteInCaseSkipelement = " (element check was skipped)";
+				}
 			    
 				System.out.println("It took " + TimeUnit.MILLISECONDS.toSeconds(differenceTime) + " seconds.");
-				System.out.println("Total healthy Links = "	+	numHealthyLink);
-			    System.out.println("Total broken Links = "	+	numInvalidLink);
-			    System.out.println("Total Exceptions = "	+	numExceptions);
-			    System.out.println("Total External Links = "	+	numExternalLinks);
-			    System.out.println("Total Browsed Pages = "	+	numBrowsedPages);
+				System.out.println("Total healthy Links = "		+	numHealthyLink		+ stNoteInCaseSkipelement);
+			    System.out.println("Total broken Links = "		+	numInvalidLink		+ stNoteInCaseSkipelement);
+			    System.out.println("Total Exceptions = "		+	numExceptions		+ stNoteInCaseSkipelement);
+			    System.out.println("Total External Links = "	+	numExternalLinks	+ stNoteInCaseSkipelement);
+			    System.out.println("Total Browsed Pages = "		+	numBrowsedPages);
+			    System.out.println("Total SEVERE in browser console = "		+	numConsoleSevere);
+			    System.out.println("Total WARNING in browser console = "	+	numConsoleWarn);
 			    
 			    new PrintStream(f_out_summary).println("It took " + TimeUnit.MILLISECONDS.toSeconds(differenceTime) + " seconds.");
-			    new PrintStream(f_out_summary).println("Total healthy Links = "	+	numHealthyLink);
-			    new PrintStream(f_out_summary).println("Total broken Links = "	+	numInvalidLink);
-			    new PrintStream(f_out_summary).println("Total Exceptions = "	+	numExceptions);
-			    new PrintStream(f_out_summary).println("Total External Links = "	+	numExternalLinks);
-			    new PrintStream(f_out_summary).println("Total Browsed Pages = "	+	numBrowsedPages);
+			    new PrintStream(f_out_summary).println("Total healthy Links = "		+	numHealthyLink		+ stNoteInCaseSkipelement);
+			    new PrintStream(f_out_summary).println("Total broken Links = "		+	numInvalidLink		+ stNoteInCaseSkipelement);
+			    new PrintStream(f_out_summary).println("Total Exceptions = "		+	numExceptions		+ stNoteInCaseSkipelement);
+			    new PrintStream(f_out_summary).println("Total External Links = "	+	numExternalLinks	+ stNoteInCaseSkipelement);
+			    new PrintStream(f_out_summary).println("Total Browsed Pages = "		+	numBrowsedPages);
+			    new PrintStream(f_out_summary).println("Total SEVERE in browser console = "		+	numConsoleSevere);
+			    new PrintStream(f_out_summary).println("Total WARNING in browser console = "	+	numConsoleWarn);
 			    f_out_summary.close();
 			    
 			    new PrintStream(f_out_error).println("Total broken Links = " + numInvalidLink);
@@ -734,6 +856,14 @@ public class LinkValidator {
 			    new PrintStream(f_out_exceptions).println("Total Exceptions = " + numExceptions);
 			    new PrintStream(f_out_exceptions).println(" ");
 			    f_out_exceptions.close();
+			    
+			    new PrintStream(f_out_consolelog).println("Total SEVERE  = " + numConsoleSevere);
+			    new PrintStream(f_out_consolelog).println("Total WARNING = " + numConsoleWarn);
+			    new PrintStream(f_out_consolelog).println(" ");
+			    f_out_consolelog.close();
+			    
+			    // re-format the output of console.log.
+			    new ReformatConsoleLogOutputFile(timeStamp);
 				
 			}
 			
@@ -748,14 +878,16 @@ public class LinkValidator {
 		finally {
 			
 			while( !dqBrowserDrivers.isEmpty() ) {
-				FirefoxDriver browserDriver = dqBrowserDrivers.pop();
+				//FirefoxDriver browserDriver = dqBrowserDrivers.pop();
+				WebDriver browserDriver = dqBrowserDrivers.pop();
 				browserDriver.close();
 			}
 			
 			OS = System.getProperty("os.name");
 			// cleanup the geckodriver in case Windows
 			if ( OS.startsWith("Windows") ) {
-				Runtime.getRuntime().exec("taskkill /F /IM geckodriver.exe /T");
+				//Runtime.getRuntime().exec("taskkill /F /IM geckodriver.exe /T");
+				Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe /T");
 			}
 
 		}

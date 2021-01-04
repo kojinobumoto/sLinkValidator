@@ -15,13 +15,15 @@
 package sLinkValidator;
 
 public class ResponseDataObj {
+	private final String pageTitle;
 	private final String respMsg;
 	private final int respCode;
 	private final String redirectUrl;
 	private final int respCodeRedirectTo;
 	private final String respMsgRedirectTo;
 	
-	public ResponseDataObj(String responseMessage, int responseCode, String redirectTo, int responseCodeRedirectTo, String responseMessageRedirectTo) {
+	public ResponseDataObj(String pageTitle, String responseMessage, int responseCode, String redirectTo, int responseCodeRedirectTo, String responseMessageRedirectTo) {
+		this.pageTitle = pageTitle;
 		this.respMsg = responseMessage;
 		this.respCode = responseCode;
 		this.redirectUrl = redirectTo;
@@ -29,6 +31,9 @@ public class ResponseDataObj {
 		this.respMsgRedirectTo = responseMessageRedirectTo;
 	}
 	
+	public String getPageTitle() {
+		return pageTitle;
+	}
 	public String getRespMsg() {
 		return respMsg;
 	}
