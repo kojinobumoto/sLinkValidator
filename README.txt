@@ -123,5 +123,4 @@ o Output
 o Others
   - This program neither follow links that created dynamically by JavaScript nor submit the form automatically.
     (follows only links in the page source.)
-  - As mentioned in above “Feature” section, this program does not support Chrome and InternetExplorer
-    since the driver of those two browser cannot take full-page screenshot.
+  - Currently, this program depends on the Chromedriver to take browser's console.log.
