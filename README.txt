@@ -3,14 +3,16 @@ o Program Name
 
 o Basic behavior
   * This program,
-    - browses the given URL by Firefox and validate link or image location in the page.
+    - browses the given URL by Chrome and validate link or image location in the page.
     — follows below 2 types of contents by default.
         "href" in <a> tag
         "src" in <img> tag
     - also checks "href" content in <link> tag if “-a” or “—all” option was specified in command line.
       (* "-skipelement" option skips all above link check and just browse given url(s))
     - validate given URL page and links in the page.
-    - continue browsing/checking if the found link path was included in the given URL.
+    - continue browsing/checking if the found link path was under the given URL (domain or initial URL).
+    - this program depends on the Chromedriver to take browser's console.log.
+
 
 o Verified Platform
   * Windows 10
@@ -23,12 +25,12 @@ o Required software/component
 
 o Feature
   * automatically follows links in browsed page.
-    - This program automatically browses links found in the given URL page if the link path contains the first URL.
+    - This program automatically browses links found in the given URL page if the link path contains the initial URL (it's a domain in most cases).
       -- "-skipelement" option skips all above link check and just browse given url(s)
     - You can specify urls by making a url list (a file contains one url per line).
   * Multi threading. 
-    The thread number, which is equal the number of simultaneously opening browser, can be specified by “-T” option.
-    If you give ‘-T auto’ as the option, this program automatically detect the number of available processor and use 
+    The thread number, which is equal to the number of simultaneously opening browser, can be specified by “-T” option.
+    If you give ‘-T auto’ as the option, this program automatically detect the number of available processor and use it.
   * BASIC authentication handling.
   * saves chrome browser's console.log.
   * takes page capture ("-capture" option)
@@ -36,8 +38,6 @@ o Feature
       --  "/" character in the URL path is replaced to "_" (underscore).
       -- Other invalid characters as the windows file name such as ? <>|"(double quote) are
          also replaced to "_".
-      -- This software does not support Chrome and InternetExplorer since the driver of those two browser
-          cannot take full page screenshot.
 
 o How to use.
   Build runnable jars with necessary jar(s) and run it as the command line application
@@ -123,4 +123,3 @@ o Output
 o Others
   - This program neither follow links that created dynamically by JavaScript nor submit the form automatically.
     (follows only links in the page source.)
-  - Currently, this program depends on the Chromedriver to take browser's console.log.
